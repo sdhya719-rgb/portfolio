@@ -1,326 +1,296 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Catch the Star</title>
-    <style>
-      body {
-        margin: 0;
-        background: linear-gradient(to top, #001f3f, #0a1a2a);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        height: 100vh;
-        overflow: hidden;
-        font-family: Arial, sans-serif;
-        touch-action: none;
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Catch the Star</title>
+  <style>
+    body {
+      margin: 0;
+      background: linear-gradient(to top, #001f3f, #0a1a2a);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      touch-action: none;
+    }
+    canvas {
+      display: block;
+      background: transparent;
+    }
+    .btn {
+      position: fixed;
+      bottom: 5%;
+      width: 60px;
+      height: 60px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      text-align: center;
+      line-height: 60px;
+      font-size: 30px;
+      color: white;
+      user-select: none;
+    }
+    #leftBtn { left: 5%; }
+    #rightBtn { right: 5%; }
+    #volumeControl {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      width: 120px;
+    }
+    #restartBtn {
+      position: fixed;
+      bottom: 20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 180px;
+      height: 50px;
+      background: linear-gradient(45deg, #ff416c, #ff4b2b);
+      border-radius: 25px;
+      text-align: center;
+      line-height: 50px;
+      font-size: 18px;
+      color: white;
+      font-weight: bold;
+      user-select: none;
+      display: none;
+      box-shadow: 0 0 15px rgba(255, 75, 43, 0.8);
+    }
+  </style>
+</head>
+<body>
+  <input type="range" id="volumeControl" min="0" max="1" step="0.01" value="0.3" />
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="leftBtn" class="btn">◀</div>
+  <div id="rightBtn" class="btn">▶</div>
+  <div id="restartBtn">Restart</div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Base resolution for gameplay
+    const baseWidth = 800;
+    const baseHeight = 600;
+
+    let scaleX = 1, scaleY = 1;
+
+    function resizeCanvas() {
+      if (window.innerWidth > 900) {
+        // Desktop view → fixed 800x600
+        canvas.width = baseWidth;
+        canvas.height = baseHeight;
+        scaleX = 1;
+        scaleY = 1;
+        canvas.style.width = baseWidth + "px";
+        canvas.style.height = baseHeight + "px";
+      } else {
+        // Mobile view → full screen
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        scaleX = canvas.width / baseWidth;
+        scaleY = canvas.height / baseHeight;
+        canvas.style.width = "100vw";
+        canvas.style.height = "100vh";
       }
-      canvas {
-        display: block;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    const basketImg = new Image();
+    basketImg.src = "basket.png";
+    const starImg = new Image();
+    starImg.src = "star.png";
+    const moonImg = new Image();
+    moonImg.src = "moon.png";
+    const cloudImg = new Image();
+    cloudImg.src = "cloud.png";
+
+    const backgroundStars = Array.from({ length: 80 }, () => ({
+      x: Math.random() * baseWidth,
+      y: Math.random() * baseHeight,
+      size: Math.random() * 2 + 1,
+      twinkleSpeed: Math.random() * 0.02 + 0.01,
+      twinklePhase: Math.random() * Math.PI * 2,
+    }));
+
+    const clouds = Array.from({ length: 5 }, () => ({
+      x: Math.random() * baseWidth,
+      y: Math.random() * (baseHeight / 2),
+      speed: Math.random() * 0.2 + 0.05,
+    }));
+
+    let basket = { x: baseWidth / 2 - 40, y: baseHeight - 80, w: 80, h: 60, speed: 8 };
+    let star = { x: Math.random() * baseWidth, y: 0, w: 40, h: 40, speed: 4, baseSpeed: 4 };
+    let score = 0, lives = 3, gameOver = false;
+    let highScore = localStorage.getItem("highScore") ? parseInt(localStorage.getItem("highScore")) : 0;
+    let time = 0;
+
+    const catchSound = new Audio("catch.mp3");
+    const missSound = new Audio("mistake.mp3");
+    const bgMusic = new Audio("bg_music.mp3");
+    bgMusic.loop = true;
+    bgMusic.volume = 0.3;
+    bgMusic.play().catch(() =>
+      document.addEventListener("keydown", () => bgMusic.play(), { once: true })
+    );
+
+    document.getElementById("volumeControl").addEventListener("input", (e) => {
+      const vol = e.target.value;
+      bgMusic.volume = vol;
+      catchSound.volume = vol;
+      missSound.volume = vol;
+    });
+
+    let keys = { left: false, right: false };
+    document.addEventListener("keydown", (e) => {
+      if (!gameOver) {
+        if (e.key === "ArrowLeft") keys.left = true;
+        if (e.key === "ArrowRight") keys.right = true;
       }
-      .btn {
-        position: absolute;
-        bottom: 20px;
-        width: 80px;
-        height: 80px;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 50%;
-        text-align: center;
-        line-height: 80px;
-        font-size: 40px;
-        color: white;
-        user-select: none;
-      }
-      #leftBtn {
-        left: 20px;
-      }
-      #rightBtn {
-        right: 20px;
-      }
-      #volumeControl {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        width: 150px;
-      }
-      label {
-        color: white;
-        font-size: 14px;
-        margin-right: 5px;
-      }
-      #restartBtn {
-        position: absolute;
-        bottom: 120px;
-        width: 150px;
-        height: 50px;
-        background: linear-gradient(45deg, #ff416c, #ff4b2b);
-        border-radius: 25px;
-        text-align: center;
-        line-height: 50px;
-        font-size: 20px;
-        color: white;
-        font-weight: bold;
-        user-select: none;
-        display: none;
-        box-shadow: 0 0 15px rgba(255, 75, 43, 0.8);
-      }
-    </style>
-  </head>
-  <body>
-    <input type="range" id="volumeControl" min="0" max="1" step="0.01" value="0.3" />
-    <canvas id="gameCanvas"></canvas>
+    });
+    document.addEventListener("keyup", (e) => {
+      if (e.key === "ArrowLeft") keys.left = false;
+      if (e.key === "ArrowRight") keys.right = false;
+    });
 
-    <div id="leftBtn" class="btn">◀</div>
-    <div id="rightBtn" class="btn">▶</div>
-    <div id="restartBtn">Restart</div>
+    let leftPressed = false, rightPressed = false;
+    document.getElementById("leftBtn").addEventListener("touchstart", () => (leftPressed = true));
+    document.getElementById("leftBtn").addEventListener("touchend", () => (leftPressed = false));
+    document.getElementById("rightBtn").addEventListener("touchstart", () => (rightPressed = true));
+    document.getElementById("rightBtn").addEventListener("touchend", () => (rightPressed = false));
 
-    <script>
-      const canvas = document.getElementById("gameCanvas");
-      const ctx = canvas.getContext("2d");
+    function resetStar() {
+      star.x = Math.random() * baseWidth;
+      star.y = 0;
+    }
 
-      const gameWidth = 800;
-      const gameHeight = 600;
-      canvas.width = gameWidth;
-      canvas.height = gameHeight;
+    function resetGame() {
+      lives = 3;
+      score = 0;
+      star.speed = star.baseSpeed;
+      gameOver = false;
+      resetStar();
+      bgMusic.play();
+      document.getElementById("restartBtn").style.display = "none";
+    }
+    document.getElementById("restartBtn").addEventListener("click", resetGame);
 
-      const basketImg = new Image();
-      basketImg.src = "basket.png";
-      const starImg = new Image();
-      starImg.src = "star.png";
-      const moonImg = new Image();
-      moonImg.src = "moon.png";
-      const cloudImg = new Image();
-      cloudImg.src = "cloud.png";
+    function drawBackground() {
+      const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      grad.addColorStop(0, "#001f3f");
+      grad.addColorStop(1, "#0a1a2a");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      const backgroundStars = Array.from({ length: 100 }, () => ({
-        x: Math.random() * gameWidth,
-        y: Math.random() * gameHeight,
-        size: Math.random() * 2 + 1,
-        twinkleSpeed: Math.random() * 0.02 + 0.01,
-        twinklePhase: Math.random() * Math.PI * 2,
-      }));
-
-      const clouds = Array.from({ length: 5 }, () => ({
-        x: Math.random() * gameWidth,
-        y: Math.random() * (gameHeight / 2),
-        speed: Math.random() * 0.2 + 0.05,
-      }));
-
-      let time = 0;
-
-      let basket = {
-        x: gameWidth / 2 - 40,
-        y: gameHeight - 80,
-        width: 80,
-        height: 60,
-        speed: 8,
-      };
-      let star = {
-        x: Math.random() * gameWidth,
-        y: 0,
-        width: 40,
-        height: 40,
-        speed: 4,
-        baseSpeed: 4,
-      };
-      let score = 0, lives = 3, gameOver = false;
-      let highScore = localStorage.getItem('highScore') ? parseInt(localStorage.getItem('highScore')) : 0;
-
-      const catchSound = new Audio("catch.mp3");
-      const missSound = new Audio("mistake.mp3");
-      const bgMusic = new Audio("bg_music.mp3");
-      bgMusic.loop = true;
-      bgMusic.volume = 0.3;
-      bgMusic.play().catch(() => document.addEventListener("keydown", () => bgMusic.play(), { once: true }));
-
-      document.getElementById("volumeControl").addEventListener("input", (e) => {
-        const vol = e.target.value;
-        bgMusic.volume = vol;
-        catchSound.volume = vol;
-        missSound.volume = vol;
-      });
-
-      let keys = { left: false, right: false };
-      document.addEventListener("keydown", (e) => {
-        if (!gameOver) {
-          if (e.key === "ArrowLeft") keys.left = true;
-          if (e.key === "ArrowRight") keys.right = true;
-        }
-      });
-      document.addEventListener("keyup", (e) => {
-        if (e.key === "ArrowLeft") keys.left = false;
-        if (e.key === "ArrowRight") keys.right = false;
-      });
-
-      let leftPressed = false, rightPressed = false;
-      document.getElementById("leftBtn").addEventListener("touchstart", () => (leftPressed = true));
-      document.getElementById("leftBtn").addEventListener("touchend", () => (leftPressed = false));
-      document.getElementById("rightBtn").addEventListener("touchstart", () => (rightPressed = true));
-      document.getElementById("rightBtn").addEventListener("touchend", () => (rightPressed = false));
-
-      let touchStartX = null;
-      canvas.addEventListener("touchstart", (e) => {
-        touchStartX = e.touches[0].clientX;
-      });
-      canvas.addEventListener("touchend", (e) => {
-        const diff = e.changedTouches[0].clientX - touchStartX;
-        if (diff > 50) basket.x += basket.speed * 10;
-        if (diff < -50) basket.x -= basket.speed * 10;
-        touchStartX = null;
-      });
-
-      window.addEventListener("resize", () => {
-        canvas.width = gameWidth;
-        canvas.height = gameHeight;
-        basket.x = gameWidth / 2 - basket.width / 2;
-        basket.y = gameHeight - 80;
-      });
-
-      function drawBackground() {
-        const grad = ctx.createLinearGradient(0, 0, 0, gameHeight);
-        grad.addColorStop(0, "#001f3f");
-        grad.addColorStop(1, "#0a1a2a");
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, gameWidth, gameHeight);
-
-        backgroundStars.forEach((s) => {
-          const opacity = 0.5 + 0.5 * Math.sin(time * s.twinkleSpeed + s.twinklePhase);
-          ctx.fillStyle = `rgba(255,255,255,${opacity})`;
-          ctx.beginPath();
-          ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-          ctx.fill();
-        });
-
-        clouds.forEach((c) => {
-          ctx.drawImage(cloudImg, c.x, c.y, 150, 80);
-          c.x += c.speed;
-          if (c.x > gameWidth) c.x = -150;
-        });
-
-        ctx.drawImage(moonImg, gameWidth - 120, 50, 100, 100);
-        time += 1;
-      }
-
-      function drawBasket() {
-        ctx.drawImage(basketImg, basket.x, basket.y, basket.width, basket.height);
-      }
-
-      function drawStar() {
-        ctx.drawImage(starImg, star.x - star.width / 2, star.y - star.height / 2, star.width, star.height);
-      }
-
-      function drawScore() {
-        const padding = 10, text = "Score: " + score;
-        ctx.font = "20px Arial";
-        const w = ctx.measureText(text).width + padding * 2, h = 30 + padding * 2;
-        const x = 20, y = 10;
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        const r = 10;
+      backgroundStars.forEach((s) => {
+        const opacity = 0.5 + 0.5 * Math.sin(time * s.twinkleSpeed + s.twinklePhase);
+        ctx.fillStyle = `rgba(255,255,255,${opacity})`;
         ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + w - r, y);
-        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-        ctx.lineTo(x + w, y + h - r);
-        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-        ctx.lineTo(x + r, y + h);
-        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.arc(s.x * scaleX, s.y * scaleY, s.size * scaleX, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = "white";
-        ctx.shadowColor = "yellow";
-        ctx.shadowBlur = 10;
-        ctx.fillText(text, x + padding, y + h - padding - 5);
-        ctx.shadowBlur = 0;
-      }
+      });
 
-      function drawLives() {
-        ctx.font = "30px Arial";
-        ctx.textAlign = "center";
-        for (let i = 0; i < lives; i++) {
-          ctx.fillStyle = "red";
-          ctx.fillText("❤️", gameWidth / 2 - 50 + i * 40, 40);
+      clouds.forEach((c) => {
+        ctx.drawImage(cloudImg, c.x * scaleX, c.y * scaleY, 150 * scaleX, 80 * scaleY);
+        c.x += c.speed;
+        if (c.x > baseWidth) c.x = -150;
+      });
+
+      ctx.drawImage(moonImg, canvas.width - 120 * scaleX, 50 * scaleY, 100 * scaleX, 100 * scaleY);
+      time += 1;
+    }
+
+    function drawBasket() {
+      ctx.drawImage(basketImg, basket.x * scaleX, basket.y * scaleY, basket.w * scaleX, basket.h * scaleY);
+    }
+
+    function drawStar() {
+      ctx.drawImage(starImg, (star.x - star.w / 2) * scaleX, (star.y - star.h / 2) * scaleY, star.w * scaleX, star.h * scaleY);
+    }
+
+    function drawScore() {
+      ctx.fillStyle = "white";
+      ctx.font = `${20 * scaleY}px Arial`;
+      ctx.shadowColor = "yellow";
+      ctx.shadowBlur = 10;
+      ctx.fillText("Score: " + score, 20 * scaleX, 40 * scaleY);
+      ctx.shadowBlur = 0;
+    }
+
+    function drawLives() {
+      ctx.font = `${25 * scaleY}px Arial`;
+      ctx.textAlign = "center";
+      for (let i = 0; i < lives; i++) {
+        ctx.fillText("❤️", canvas.width / 2 - 40 * scaleX + i * 30 * scaleX, 40 * scaleY);
+      }
+      ctx.textAlign = "start";
+    }
+
+    function drawGameOver() {
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "white";
+      ctx.textAlign = "center";
+      ctx.font = `${60 * scaleY}px Impact`;
+      ctx.shadowColor = "red";
+      ctx.shadowBlur = 25;
+      ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 80 * scaleY);
+      ctx.shadowColor = "yellow";
+      ctx.shadowBlur = 15;
+      ctx.font = `${24 * scaleY}px Arial`;
+      ctx.fillText("Final Score: " + score, canvas.width / 2, canvas.height / 2 - 20 * scaleY);
+      ctx.fillText("High Score: " + highScore, canvas.width / 2, canvas.height / 2 + 20 * scaleY);
+      ctx.shadowColor = "cyan";
+      ctx.shadowBlur = 10;
+      ctx.fillText("Tap Restart to Play Again", canvas.width / 2, canvas.height / 2 + 80 * scaleY);
+      ctx.textAlign = "start";
+      document.getElementById("restartBtn").style.display = "block";
+    }
+
+    function update() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawBackground();
+      drawBasket();
+      drawStar();
+      drawScore();
+      drawLives();
+
+      if (!gameOver) {
+        star.y += star.speed;
+        if (keys.left || leftPressed) basket.x -= basket.speed;
+        if (keys.right || rightPressed) basket.x += basket.speed;
+        basket.x = Math.max(0, Math.min(baseWidth - basket.w, basket.x));
+
+        if (star.y > basket.y && star.x > basket.x && star.x < basket.x + basket.w) {
+          score++;
+          catchSound.currentTime = 0;
+          catchSound.play();
+          if (score % 5 === 0) star.speed += 0.5;
+          resetStar();
         }
-        ctx.textAlign = "start";
+        if (star.y > baseHeight) {
+          lives--;
+          missSound.currentTime = 0;
+          missSound.play();
+          if (lives <= 0) {
+            gameOver = true;
+            highScore = Math.max(highScore, score);
+            localStorage.setItem("highScore", highScore);
+            bgMusic.pause();
+          } else resetStar();
+        }
+      } else {
+        drawGameOver();
       }
+      requestAnimationFrame(update);
+    }
 
-      function drawGameOver() {
-        ctx.fillStyle = "rgba(0,0,0,0.7)";
-        ctx.fillRect(0, 0, gameWidth, gameHeight);
-        const centerX = gameWidth / 2;
-        const centerY = gameHeight / 2;
-        ctx.fillStyle = "white";
-        ctx.font = "70px Impact";
-        ctx.textAlign = "center";
-        ctx.shadowColor = "red";
-        ctx.shadowBlur = 25;
-        ctx.fillText("GAME OVER", centerX, centerY - 80);
-        ctx.shadowColor = "yellow";
-        ctx.shadowBlur = 15;
-        ctx.font = "30px Arial";
-        ctx.fillText("Final Score: " + score, centerX, centerY - 20);
-        ctx.fillText("High Score: " + highScore, centerX, centerY + 20);
-        ctx.shadowColor = "cyan";
-        ctx.shadowBlur = 10;
-        ctx.font = "24px Arial";
-        ctx.fillText("Tap Restart to Play Again", centerX, centerY + 80);
-        document.getElementById("restartBtn").style.display = "block";  
-        ctx.textAlign = "start";
-      }
-
-      function update() {
-        ctx.clearRect(0, 0, gameWidth, gameHeight);
-        drawBackground();
-        drawBasket();
-        drawStar();
-        drawScore();
-        drawLives();
-
-        if (!gameOver) {
-          star.y += star.speed;
-          if (keys.left || leftPressed) basket.x -= basket.speed;
-          if (keys.right || rightPressed) basket.x += basket.speed;
-          basket.x = Math.max(0, Math.min(gameWidth - basket.width, basket.x));
-          if (star.y > basket.y && star.x > basket.x && star.x < basket.x + basket.width) {
-            score++;
-            catchSound.currentTime = 0;
-            catchSound.play();
-            if (score % 5 === 0) star.speed += 0.5;
-            resetStar();
-          }
-          if (star.y > gameHeight) {
-            lives--;
-            missSound.currentTime = 0;
-            missSound.play();
-            if (lives <= 0) {
-              gameOver = true;
-              highScore = Math.max(highScore, score);
-              localStorage.setItem('highScore', highScore);
-              bgMusic.pause();
-            } else resetStar();
-          }
-        } else drawGameOver();
-        requestAnimationFrame(update);
-      }
-
-      function resetStar() {
-        star.x = Math.random() * gameWidth;
-        star.y = 0;
-      }
-
-      function resetGame() {
-        lives = 3;
-        score = 0;
-        star.speed = star.baseSpeed;
-        gameOver = false;
-        resetStar();
-        bgMusic.play();
-        document.getElementById("restartBtn").style.display = "none";        
-      }
-
-      document.getElementById("restartBtn").addEventListener("click", resetGame); 
-      update();
-    </script>
-  </body>
+    update();
+  </script>
+</body>
 </html>
