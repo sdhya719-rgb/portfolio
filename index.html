@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Portfolio</title>
     <style>
+      html {
+        scroll-behavior: smooth;
+      }
       body {
         margin: 0;
         font-family: Arial, sans-serif;
@@ -15,6 +18,9 @@
       nav {
         background-color: #87ceeb;
         padding: 20px 0;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
       }
 
       nav ul {
@@ -53,6 +59,13 @@
         min-height: 0;
       }
 
+      #home,
+      #about,
+      #games,
+      #contact {
+        padding-top: 80px;
+      }
+
       #home .home-container,
       #about .about-container {
         display: flex;
@@ -79,7 +92,8 @@
 
       #home .home-content h1,
       #about .about-content h1,
-      #contact h1 {
+      #contact h1,
+      #games h1 {
         font-size: 28px;
         color: #87ceeb;
         margin-bottom: 16px;
@@ -132,6 +146,41 @@
         background-color: #333;
       }
 
+      /* Games Section Styles */
+      #games {
+        text-align: center;
+      }
+
+      .game-card {
+        display: inline-block;
+        background: #ffffff;
+        border: 2px solid #87ceeb;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(135, 206, 235, 0.3);
+        padding: 16px;
+        margin-top: 20px;
+        transition: transform 0.2s, box-shadow 0.2s;
+        cursor: pointer;
+      }
+
+      .game-card:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 12px rgba(135, 206, 235, 0.5);
+      }
+
+      .game-card img {
+        width: 200px;
+        height: 140px;
+        object-fit: cover;
+        border-radius: 8px;
+      }
+
+      .game-card p {
+        margin: 10px 0 0;
+        font-weight: bold;
+        color: #333;
+      }
+
       footer {
         background-color: #87ceeb;
         color: white;
@@ -146,8 +195,9 @@
   <body>
     <nav>
       <ul>
-        <li><a href="#home">Home</a></li>
+        <li><a href="#">Home</a></li>
         <li><a href="#about">About Me</a></li>
+        <li><a href="#games">My Games</a></li>
         <li><a href="#contact">Contact</a></li>
       </ul>
     </nav>
@@ -189,6 +239,32 @@
             count. Let’s make the world a brighter place together! ✨
           </p>
         </div>
+      </div>
+    </section>
+
+    <!-- New Games Section -->
+    <section id="games">
+      <h1>My Games</h1>
+      <div
+        class="game-card"
+        onclick="window.open('games/catch_the_star.html', '_blank')"
+      >
+        <img src="games/old.png" alt="CatchStar Game" />
+        <p>CatchStar(old)</p>
+      </div>
+      <div
+        class="game-card"
+        onclick="window.open('games/catch_the_star_new.html', '_blank')"
+      >
+        <img src="games/new.png" alt="CatchStar Game(new)" />
+        <p>CatchStar(new)</p>
+      </div>
+      <div
+        class="game-card"
+        onclick="window.open('games/catch.html', '_blank')"
+      >
+        <img src="games/document.png" alt="CatchStar Game(new)" />
+        <p>Document</p>
       </div>
     </section>
 
