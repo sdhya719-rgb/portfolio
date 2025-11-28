@@ -101,13 +101,13 @@
     resizeCanvas();
 
     const basketImg = new Image();
-    basketImg.src = "basket.png";
+    basketImg.src = "baskets.png";
     const starImg = new Image();
-    starImg.src = "star.png";
+    starImg.src = "stars.png";
     const moonImg = new Image();
-    moonImg.src = "moon.png";
+    moonImg.src = "moons.png";
     const cloudImg = new Image();
-    cloudImg.src = "cloud.png";
+    cloudImg.src = "clouds.png";
 
     const backgroundStars = Array.from({ length: 80 }, () => ({
       x: Math.random() * baseWidth,
@@ -129,9 +129,9 @@
     let highScore = localStorage.getItem("highScore") ? parseInt(localStorage.getItem("highScore")) : 0;
     let time = 0;
 
-    const catchSound = new Audio("catch.mp3");
-    const missSound = new Audio("mistake.mp3");
-    const bgMusic = new Audio("bg_music.mp3");
+    const catchSound = new Audio("catching.mp3");
+    const missSound = new Audio("mistakes.mp3");
+    const bgMusic = new Audio("bgmusic.mp3");
     bgMusic.loop = true;
     bgMusic.volume = 0.3;
     bgMusic.play().catch(() =>
@@ -293,4 +293,5 @@
   </script>
 </body>
 </html>
+
 
