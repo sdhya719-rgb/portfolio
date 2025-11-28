@@ -62,6 +62,7 @@
       #home,
       #about,
       #games,
+      #learning,
       #contact {
         padding-top: 80px;
       }
@@ -90,20 +91,13 @@
         flex: 1 1 250px;
       }
 
-      #home .home-content h1,
-      #about .about-content h1,
-      #contact h1,
-      #games h1 {
+      #home h1,
+      #about h1,
+      #games h1,
+      #contact h1 {
         font-size: 28px;
         color: #87ceeb;
         margin-bottom: 16px;
-      }
-
-      #home .home-content p,
-      #about .about-content p {
-        font-size: 18px;
-        line-height: 1.6;
-        margin-bottom: 8px;
       }
 
       #contact {
@@ -146,11 +140,12 @@
         background-color: #333;
       }
 
-      /* Games Section Styles */
+
       #games {
         text-align: center;
       }
 
+      /* Game Cards */
       .game-card {
         display: inline-block;
         background: #ffffff;
@@ -181,6 +176,67 @@
         color: #333;
       }
 
+
+      .learning-container {
+        text-align: center;
+      }
+
+      .learning-card {
+        display: inline-block;
+        width: 280px;
+        height: 220px;
+        background: #ffffff;
+        border: 2px solid #87ceeb;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 15px;
+        box-shadow: 0 3px 10px rgba(135, 206, 235, 0.25);
+        vertical-align: top;
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        text-align: center;
+      }
+
+      .learning-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 15px rgba(135, 206, 235, 0.45);
+      }
+
+      .learning-card h2 {
+        font-size: 20px;
+        color: #87ceeb;
+        margin-bottom: 10px;
+      }
+
+      .learning-card p {
+        font-size: 15px;
+        margin-bottom: 12px;
+      }
+
+      /* Styled link buttons */
+      .learning-card a {
+        display: inline-block;
+        padding: 8px 14px;
+        background: #87ceeb;
+        color: white;
+        text-decoration: none;
+        font-size: 15px;
+        border-radius: 6px;
+        transition: background 0.2s;
+        margin-top: 10px;
+      }
+
+      .learning-card a:hover {
+        background: #333;
+      }
+
+      /* RESPONSIVE */
+      @media (max-width: 650px) {
+        .learning-card {
+          width: 90%;
+          height: auto;
+        }
+      }
+
       footer {
         background-color: #87ceeb;
         color: white;
@@ -192,6 +248,7 @@
       }
     </style>
   </head>
+
   <body>
     <nav>
       <ul>
@@ -227,66 +284,76 @@
         <div class="about-content">
           <h1>About Me</h1>
           <p>
-            Hi, I'm Sandhya Pandey, a proud Nepalese with roots in the beautiful
-            Gulmi, Lumbini Province! 🌄 Now, I'm soaking up the vibrant energy
-            of Busan, South Korea, living in Buyong-dong, Seogu. I'm a student
-            at Dong-A University (Bumin Campus), chasing my dreams and embracing
-            new adventures. When I'm not studying, you might find me exploring
-            Busan's beaches or savoring some spicy Korean food! 😋 I love
-            connecting with people, so feel free to reach out to me at
-            sdhya719@gmail.com or give me a call at my super-secret phone number
-            (it’s a South Korean number starting with +82!). I’m all about
-            spreading positivity, learning new things, and making every moment
-            count. Let’s make the world a brighter place together! ✨
+            Hi, I'm Sandhya Pandey, a proud Nepalese with roots in Gulmi,
+            Lumbini Province! 🌄 Now living in Busan, South Korea (Buyong-dong,
+            Seogu). I’m a student at Dong-A University (Bumin Campus)!
           </p>
         </div>
       </div>
     </section>
 
-    <!-- New Games Section -->
     <section id="games">
       <h1>My Games</h1>
       <div
         class="game-card"
-        onclick="window.open('catch_the_star.html', '_blank')"
+        onclick="window.open('games/catch_the_star.html', '_blank')"
       >
-        <img src="old.png" alt="CatchStar Game" />
+        <img src="games/old.png" alt="CatchStar Game" />
         <p>Catch the Star(old)</p>
       </div>
       <div
         class="game-card"
-        onclick="window.open('catch_the_star_new.html', '_blank')"
+        onclick="window.open('games/catch_the_star_new.html', '_blank')"
       >
-        <img src="new.png" alt="Catch the Star(new)" />
+        <img src="games/new.png" alt="Catch the Star(new)" />
         <p>Catch the Star(new)</p>
       </div>
       <div
         class="game-card"
         onclick="window.open('https://docs.google.com/document/d/1diIID6nKCby331Kj95sdaYTVWjeQ1NPg57pngJv0mK0/edit?usp=sharing', '_blank')"
       >
-        <img src="document.png" alt="Catch the Star(new)" />
+        <img src="games/document.png" alt="document" />
         <p>Document</p>
       </div>
     </section>
+
     <section id="learning">
+      <h1>Learning</h1>
 
+      <div class="learning-container">
+        <div class="learning-card">
+          <h2>Programming Fundamentals</h2>
+          <p>Check Out My Python Journey</p>
+          <a
+            href="https://chatgpt.com/share/6901bc5f-d0a4-800c-9fb4-6a7a7568f24a"
+            target="_blank"
+            >🔗 AI Chat History</a
+          >
+          <br /><br />
+          <a
+            href="https://colab.research.google.com/drive/1Yc0U7-t82AYxhq4S8FGB9VKitDvGE7Hw?usp=sharing"
+            target="_blank"
+            >📘 Completed ipynb file</a
+          >
+        </div>
 
-<div class="game-card">
-  <h2>Programming Fundamentals 🐍</h2>
-  <p>Check Out My Python Programming Learning Journey</p>
-  <a href="https://chatgpt.com/share/6901bc5f-d0a4-800c-9fb4-6a7a7568f24a" target="_blank">🔗 AI Chat History</a><br>
-  <a href="https://colab.research.google.com/drive/1Yc0U7-t82AYxhq4S8FGB9VKitDvGE7Hw?usp=sharing" target="_blank">📘 Completed ipynb file</a>
-</div>
-
-
-  
-</section>
+        <div class="learning-card">
+          <h2>Tool Creation</h2>
+          <p>Click below to view my tool project</p>
+          <a href="tool-creation/tool-sandhyapandey.html" target="_blank"
+            >🔗 View Tool</a
+          >
+        </div>
+      </div>
+    </section>
 
     <section id="contact">
       <h1>Contact Me</h1>
       <form>
-        Name: <input type="text" placeholder="Enter your name" /> Email:
-        <input type="email" placeholder="Enter your email" /> Message:
+        Name: <input type="text" placeholder="Enter your name" />
+        Email:
+        <input type="email" placeholder="Enter your email" />
+        Message:
         <textarea placeholder="Your message"></textarea>
         <button type="submit">Send</button>
       </form>
