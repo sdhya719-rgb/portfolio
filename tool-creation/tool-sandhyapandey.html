@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Analysis Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://unpkg.com/@sgratzl/chartjs-chart-boxplot@3.10.0/build/index.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --sky-blue: #87ceeb;
+            --sidebar-gradient: linear-gradient(180deg, #1e1b4b 0%, #0f172a 60%, #1e3a8a 100%);
+            --accent-gradient: linear-gradient(135deg, #6366f1 0%, #87ceeb 100%);
+            
+            /* Theme Colors for Split View */
+            --theme-all: #ef4444; /* Red for All Data */
+            --theme-anom: #10b981; /* Green for Anomalies */
+            
+            --bg-app: #f3f4f6;
+            --surface: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --text-light: #e0e7ff;
+            --border: #e5e7eb;
+            --anomaly-z: #fee2e2;
+            --anomaly-sd: #fef3c7;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-app);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* Sidebar */
+        #sidebar {
+            width: 300px;
+            background: var(--sidebar-gradient);
+            color: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex-shrink: 0;
+            border-right: 1px solid rgba(135, 206, 235, 0.2);
+        }
+
+        #main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Sidebar Components */
+        .brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .sidebar-title {
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            color: var(--sky-blue);
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .control-group { margin-bottom: 1rem; }
+        .control-group label { display: block; font-size: 0.875rem; margin-bottom: 0.5rem; color: #c7d2fe; }
+        .control-group input {
+            width: 100%; padding: 0.5rem; border-radius: 0.375rem;
+            border: 1px solid #4338ca; background: rgba(255, 255, 255, 0.1); color: white;
+        }
+        .control-group input:focus { outline: none; border-color: var(--sky-blue); }
+
+        .btn {
+            display: block; width: 100%; padding: 0.75rem; border-radius: 0.5rem;
+            border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center;
+        }
+        .btn-primary { background: var(--accent-gradient); color: white; box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.4); }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        .upload-area {
+            border: 2px dashed rgba(135, 206, 235, 0.5); border-radius: 0.5rem; padding: 1.5rem;
+            text-align: center; cursor: pointer; transition: all 0.2s; background: rgba(255, 255, 255, 0.05);
+        }
+        .upload-area:hover { border-color: var(--sky-blue); background: rgba(255, 255, 255, 0.1); }
+
+        /* General UI */
+        .card {
+            background: var(--surface); border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 1.5rem;
+            border: 1px solid var(--border);
+        }
+        .hidden { display: none !important; }
+
+        /* Summary Header */
+        .summary-split { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 0.5rem; }
+        .summary-col h4 {
+            font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;
+            color: var(--text-muted); margin-bottom: 1rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem;
+        }
+        .summary-col.left h4 { border-color: var(--primary); }
+        .summary-col.right h4 { border-color: var(--theme-all); } /* Red for Anomaly Summary Header */
+        
+        .summary-stat { display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem; }
+        .summary-stat span:last-child { font-weight: 700; font-size: 1.1rem; }
+
+        /* --- SPLIT STATS GRID CSS --- */
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem;
+        }
+
+        .stat-card {
+            background: var(--surface); border-radius: 0.75rem; border: 1px solid var(--border);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); overflow: hidden;
+        }
+
+        .stat-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem; border-bottom: 1px solid var(--border); background: #f9fafb;
+        }
+        .stat-title { font-weight: 700; color: var(--text-main); font-size: 1rem; }
+        
+        .stat-btn {
+            font-size: 0.75rem; padding: 0.25rem 0.75rem; background: #e0e7ff; color: #4338ca;
+            border-radius: 1rem; border: none; cursor: pointer; font-weight: 500;
+        }
+        .stat-btn:hover { background: var(--sky-blue); color: white; }
+
+        .stat-body-split {
+            display: grid;
+            grid-template-columns: 1fr 1px 1fr; /* Left, Divider, Right */
+            align-items: stretch;
+        }
+
+        .stat-column {
+            padding: 1rem;
+            font-size: 0.85rem;
+        }
+
+        .stat-divider { background: var(--border); height: 100%; width: 1px; }
+
+        .stat-col-header {
+            font-size: 0.75rem; text-transform: uppercase; font-weight: 700;
+            margin-bottom: 0.75rem; letter-spacing: 0.05em;
+        }
+
+        /* Color Themes for Columns */
+        .col-all .stat-col-header { color: var(--theme-all); } /* Red */
+        .col-anom .stat-col-header { color: var(--theme-anom); } /* Green */
+
+        .stat-row {
+            display: flex; justify-content: space-between; margin-bottom: 0.4rem;
+        }
+        .stat-row b { font-weight: 600; }
+        .stat-row.total-sd {
+            margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--border);
+        }
+
+        /* Table & Controls */
+        .table-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
+        .control-cluster { display: flex; gap: 1rem; align-items: center; }
+        .view-select { padding: 0.5rem; border-radius: 0.375rem; border: 1px solid var(--border); font-size: 0.875rem; min-width: 200px; }
+        
+        .export-btn {
+            background: var(--accent-gradient); color: white; border: none; padding: 0.5rem 1rem;
+            border-radius: 0.375rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .export-btn:hover { opacity: 0.9; }
+
+        .table-container { overflow: auto; border-radius: 0.5rem; border: 1px solid var(--border); max-height: 600px; background: white; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; white-space: nowrap; }
+        th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background-color: #f9fafb; font-weight: 600; position: sticky; top: 0; z-index: 10; color: var(--text-muted); cursor: pointer; }
+        th:hover { background-color: #f3f4f6; }
+        tr:hover td { background-color: #f9fafb; }
+        tr.anomaly-z td { background-color: var(--anomaly-z); }
+        tr.anomaly-sd td { background-color: var(--anomaly-sd); }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5);
+            display: flex; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(2px);
+        }
+        .modal {
+            background: white; padding: 2rem; border-radius: 1rem; width: 90%; max-width: 900px; max-height: 90vh;
+            overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            body { flex-direction: column; overflow: auto; }
+            #sidebar { width: 100%; height: auto; overflow: visible; }
+            #main-content { overflow: visible; }
+            .summary-split { grid-template-columns: 1fr; }
+            .table-controls { flex-direction: column; align-items: flex-start; }
+            .control-cluster { width: 100%; flex-wrap: wrap; }
+            .stat-body-split { grid-template-columns: 1fr; } 
+            .stat-divider { width: 100%; height: 1px; margin: 0.5rem 0; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+        <div class="brand"><span>⚡</span> CSV Analyzer</div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-title">Data Source</div>
+            <div class="upload-area" onclick="document.getElementById('csvInput').click()">
+                <input type="file" id="csvInput" accept=".csv" onchange="handleFileUpload(event)" style="display:none">
+                <div style="font-size: 2.5rem; margin-bottom: 0.25rem;">📄</div>
+                <div style="font-size: 0.875rem; font-weight: bold; color: var(--sky-blue);">CSV FILE</div>
+                <div id="fileNameDisplay" style="font-size: 0.75rem; color: #c7d2fe; margin-top: 0.5rem; word-break: break-all;">Click to Upload</div>
+            </div>
+        </div>
+
+        <div id="controlsSection" class="hidden">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Anomaly Thresholds</div>
+                <div class="control-group">
+                    <label>Z-Score (Default: 3)</label>
+                    <input type="number" id="zThreshold" value="3" step="0.1">
+                </div>
+                <div class="control-group">
+                    <label>SD Multiplier (Default: 2)</label>
+                    <input type="number" id="sdThreshold" value="2" step="0.1">
+                </div>
+                <button class="btn btn-primary" onclick="analyzeData()">Apply Thresholds</button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main id="main-content">
+        <div id="welcomeState" style="text-align: center; margin-top: 4rem; color: var(--text-muted);">
+            <h2>Welcome to CSV Analyzer</h2>
+            <p>Upload a file from the sidebar to begin analysis.</p>
+        </div>
+
+        <div id="dashboard" class="hidden">
+            
+            <!-- Summary Split -->
+            <div class="card summary-split">
+                <div class="summary-col left">
+                    <h4>Dataset Overview</h4>
+                    <div class="summary-stat"><span>Total Rows</span> <span id="sumTotalRows" style="color:var(--primary);">0</span></div>
+                    <div class="summary-stat"><span>Columns Analyzed</span> <span id="sumTotalCols">0</span></div>
+                    <div class="summary-stat"><span>Time</span> <span id="sumTime">0ms</span></div>
+                </div>
+                <div class="summary-col right">
+                    <h4>Anomaly Report</h4>
+                    <div class="summary-stat"><span>Rows with Anomalies</span> <span id="sumAnomalyRows" style="color:var(--theme-all);">0</span></div>
+                    <div class="summary-stat"><span>Anomaly Rate</span> <span id="sumAnomalyRate">0%</span></div>
+                    <!-- Updated Counts -->
+                    <div class="summary-stat"><span>Flagged by Z-Score</span> <span id="sumZCount">0</span></div>
+                    <div class="summary-stat"><span>Flagged by SD Multiplier</span> <span id="sumSdCount">0</span></div>
+                </div>
+            </div>
+
+            <!-- Split Column Stats Grid -->
+            <div class="card" style="margin-bottom: 2rem;">
+                <h3 style="margin-bottom: 1.5rem; font-size: 1.125rem;">Column Statistics</h3>
+                <div id="statsGrid" class="stats-grid"></div>
+            </div>
+
+            <!-- Table -->
+            <div class="card">
+                <div class="table-controls">
+                    <h3 style="font-size: 1.125rem;">Data Explorer</h3>
+                    <div class="control-cluster">
+                        <select id="viewModeSelect" class="view-select" onchange="handleViewChange()">
+                            <option value="all">View: All Data</option>
+                            <option value="anomalies">View: Anomalies Only</option>
+                        </select>
+                        <button id="dynamicExportBtn" class="export-btn" onclick="handleExportClick()">Download Full CSV</button>
+                        <button class="stat-btn" style="background:var(--bg-app); border:1px solid var(--border); padding: 0.5rem 1rem;" onclick="addFilter()">+ Add Filter</button>
+                    </div>
+                </div>
+
+                <div id="activeFilters" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;"></div>
+
+                <div class="table-container">
+                    <table id="dataTable">
+                        <thead><tr id="tableHeader"></tr></thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+                <div id="rowCount" style="margin-top: 1rem; color: var(--text-muted); font-size: 0.875rem;"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal -->
+    <div id="vizModal" class="modal-overlay hidden" onclick="if(event.target === this) closeViz()">
+        <div class="modal">
+            <div style="display:flex; justify-content:space-between; margin-bottom:1.5rem;">
+                <h2 id="vizTitle">Column Analysis</h2>
+                <button onclick="closeViz()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">×</button>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+                <div>
+                    <h3 style="margin-bottom:1rem; font-size:1rem; color:var(--text-muted);">Histogram (All Data)</h3>
+                    <canvas id="histCanvas" height="200"></canvas>
+                </div>
+                <div>
+                    <h3 style="margin-bottom:1rem; font-size:1rem; color:var(--text-muted);">Box Plot (All Data)</h3>
+                    <canvas id="boxCanvas" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let rawData = [];
+        let headers = [];
+        let columnTypes = {};
+        let stats = {};
+        let activeFilters = [];
+        let sortConfig = { column: null, direction: 'asc' };
+        let charts = { hist: null, box: null };
+        let originalFilename = "data";
+
+        // DOM
+        const els = {
+            csvInput: document.getElementById('csvInput'),
+            fileNameDisplay: document.getElementById('fileNameDisplay'),
+            controlsSection: document.getElementById('controlsSection'),
+            welcomeState: document.getElementById('welcomeState'),
+            dashboard: document.getElementById('dashboard'),
+            statsGrid: document.getElementById('statsGrid'),
+            sumTotalRows: document.getElementById('sumTotalRows'),
+            sumTotalCols: document.getElementById('sumTotalCols'),
+            sumTime: document.getElementById('sumTime'),
+            sumAnomalyRows: document.getElementById('sumAnomalyRows'),
+            sumAnomalyRate: document.getElementById('sumAnomalyRate'),
+            sumZCount: document.getElementById('sumZCount'),
+            sumSdCount: document.getElementById('sumSdCount'), // Added this
+            zInput: document.getElementById('zThreshold'),
+            sdInput: document.getElementById('sdThreshold'),
+            viewSelect: document.getElementById('viewModeSelect'),
+            exportBtn: document.getElementById('dynamicExportBtn'),
+            thead: document.getElementById('tableHeader'),
+            tbody: document.getElementById('tableBody'),
+            rowCount: document.getElementById('rowCount'),
+            activeFilters: document.getElementById('activeFilters'),
+            vizModal: document.getElementById('vizModal'),
+            vizTitle: document.getElementById('vizTitle')
+        };
+
+        // --- Logic ---
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            originalFilename = file.name.replace('.csv', '');
+            els.fileNameDisplay.textContent = file.name;
+            const startTime = performance.now();
+
+            Papa.parse(file, {
+                header: true, dynamicTyping: true, skipEmptyLines: true,
+                complete: function (results) {
+                    if (results.data.length === 0) return alert("Empty CSV");
+                    rawData = results.data;
+                    headers = results.meta.fields;
+                    headers.forEach(h => {
+                        const valid = rawData.find(r => r[h] !== null && r[h] !== '');
+                        columnTypes[h] = (typeof valid?.[h] === 'number') ? 'number' : 'string';
+                    });
+                    els.welcomeState.classList.add('hidden');
+                    els.dashboard.classList.remove('hidden');
+                    els.controlsSection.classList.remove('hidden');
+                    analyzeData(startTime);
+                },
+                error: err => alert("Error: " + err.message)
+            });
+        }
+
+        // Helper: Calculate basic stats array
+        function calculateBasicStats(values) {
+            if (values.length === 0) return null;
+            const n = values.length;
+            const mean = values.reduce((a, b) => a + b, 0) / n;
+            const sorted = [...values].sort((a, b) => a - b);
+            const median = n % 2 === 0 ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2 : sorted[Math.floor(n / 2)];
+            const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n;
+            const stdDev = Math.sqrt(variance);
+            const min = sorted[0];
+            const max = sorted[n - 1];
+            return { mean, median, min, max, stdDev, count: n };
+        }
+
+        function analyzeData(startTime = null) {
+            if(!startTime) startTime = performance.now();
+            stats = {};
+            const zThresh = parseFloat(els.zInput.value) || 3;
+            const sdThresh = parseFloat(els.sdInput.value) || 2;
+            let zCount = 0;
+            let sdCount = 0; // Added SD Counter
+
+            // Reset anomalies
+            rawData.forEach(r => r._anomalies = []);
+
+            headers.forEach(col => {
+                if (columnTypes[col] === 'number') {
+                    // 1. Get All Values
+                    const allValues = rawData.map(r => r[col]).filter(v => v !== null && v !== '' && !isNaN(v));
+                    if (allValues.length === 0) return;
+
+                    // 2. Calculate Stats for All Data
+                    const allStats = calculateBasicStats(allValues);
+
+                    // 3. Detect Anomalies & Collect Anomaly Values
+                    const anomalyValues = [];
+                    
+                    rawData.forEach(row => {
+                        const val = row[col];
+                        if (val === null || val === '' || isNaN(val)) return;
+
+                        let isAnomaly = false;
+                        const zScore = (val - allStats.mean) / allStats.stdDev;
+                        
+                        if (Math.abs(zScore) > zThresh) {
+                            row._anomalies.push({ col, type: 'z', val });
+                            zCount++;
+                            isAnomaly = true;
+                        } else if (Math.abs(val - allStats.mean) > sdThresh * allStats.stdDev) {
+                            row._anomalies.push({ col, type: 'sd', val });
+                            sdCount++; // Increment SD count
+                            isAnomaly = true;
+                        }
+
+                        if(isAnomaly) {
+                            anomalyValues.push(val);
+                        }
+                    });
+
+                    // 4. Calculate Stats for Anomalies Only
+                    const anomStats = calculateBasicStats(anomalyValues);
+
+                    // Store both sets of stats
+                    stats[col] = {
+                        all: { ...allStats, values: allValues },
+                        anomalies: anomStats // might be null if no anomalies
+                    };
+                }
+            });
+
+            // Summary
+            const rowsWithAnomalies = rawData.filter(r => r._anomalies.length > 0).length;
+            const totalRows = rawData.length;
+            const rate = ((rowsWithAnomalies / totalRows) * 100).toFixed(1);
+            const endTime = performance.now();
+
+            els.sumTotalRows.textContent = totalRows.toLocaleString();
+            els.sumTotalCols.textContent = headers.length;
+            els.sumTime.textContent = (endTime - startTime).toFixed(0) + 'ms';
+            els.sumAnomalyRows.textContent = rowsWithAnomalies.toLocaleString();
+            els.sumAnomalyRate.textContent = rate + '%';
+            els.sumZCount.textContent = zCount.toLocaleString();
+            els.sumSdCount.textContent = sdCount.toLocaleString(); // Update SD Count UI
+
+            renderStats();
+            renderTable();
+        }
+
+        function renderStats() {
+            els.statsGrid.innerHTML = '';
+            Object.keys(stats).forEach(col => {
+                const s = stats[col];
+                
+                // Helper to render a number or dash
+                const fmt = (num) => num !== undefined && num !== null ? num.toFixed(2) : '-';
+                
+                // Generate HTML for Anomalies side
+                let anomHtml = `<div class="stat-row" style="justify-content:center; color:#ccc;">No Anomalies</div>`;
+                if(s.anomalies) {
+                    anomHtml = `
+                        <div class="stat-row"><span>Mean:</span> <b>${fmt(s.anomalies.mean)}</b></div>
+                        <div class="stat-row"><span>Median:</span> <b>${fmt(s.anomalies.median)}</b></div>
+                        <div class="stat-row"><span>Min:</span> <b>${s.anomalies.min}</b></div>
+                        <div class="stat-row"><span>Max:</span> <b>${s.anomalies.max}</b></div>
+                        <div class="stat-row total-sd"><span>StdDev:</span> <b>${fmt(s.anomalies.stdDev)}</b></div>
+                    `;
+                }
+
+                els.statsGrid.innerHTML += `
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-title">${col}</div>
+                        <button class="stat-btn" onclick="showViz('${col}')">Visualize</button>
+                    </div>
+                    
+                    <div class="stat-body-split">
+                        <!-- Left: All Data (Red) -->
+                        <div class="stat-column col-all">
+                            <div class="stat-col-header">All Data (${s.all.count})</div>
+                            <div class="stat-row"><span>Mean:</span> <b>${fmt(s.all.mean)}</b></div>
+                            <div class="stat-row"><span>Median:</span> <b>${fmt(s.all.median)}</b></div>
+                            <div class="stat-row"><span>Min:</span> <b>${s.all.min}</b></div>
+                            <div class="stat-row"><span>Max:</span> <b>${s.all.max}</b></div>
+                            <div class="stat-row total-sd"><span>StdDev:</span> <b>${fmt(s.all.stdDev)}</b></div>
+                        </div>
+
+                        <div class="stat-divider"></div>
+
+                        <!-- Right: Anomalies (Green) -->
+                        <div class="stat-column col-anom">
+                            <div class="stat-col-header">Anomalies (${s.anomalies ? s.anomalies.count : 0})</div>
+                            ${anomHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+            });
+        }
+
+        function handleViewChange() {
+            const mode = els.viewSelect.value;
+            if(mode === 'all') {
+                els.exportBtn.textContent = "Download Full CSV";
+                els.exportBtn.style.background = "var(--accent-gradient)";
+            } else {
+                els.exportBtn.textContent = "Download Anomalies Only";
+                els.exportBtn.style.background = "linear-gradient(135deg, #ef4444 0%, #fca5a5 100%)";
+            }
+            renderTable();
+        }
+
+        function handleExportClick() {
+            downloadCSV(els.viewSelect.value);
+        }
+
+        function renderTable() {
+            const viewMode = els.viewSelect.value;
+            let displayData = rawData.filter(row => {
+                if (viewMode === 'anomalies' && row._anomalies.length === 0) return false;
+                return activeFilters.every(f => {
+                    const val = row[f.column];
+                    if (val == null) return false;
+                    if (columnTypes[f.column] === 'number') {
+                        const numVal = parseFloat(f.value);
+                        if (isNaN(numVal)) return true;
+                        switch (f.operator) {
+                            case '>': return val > numVal;
+                            case '<': return val < numVal;
+                            case '>=': return val >= numVal;
+                            case '<=': return val <= numVal;
+                            case '=': return val === numVal;
+                            default: return true;
+                        }
+                    } else {
+                        return String(val).toLowerCase().includes(f.value.toLowerCase());
+                    }
+                });
+            });
+
+            if (sortConfig.column) {
+                displayData.sort((a, b) => {
+                    let valA = a[sortConfig.column];
+                    let valB = b[sortConfig.column];
+                    if (valA === valB) return 0;
+                    if (valA === null) return 1;
+                    if (valB === null) return -1;
+                    return (valA > valB ? 1 : -1) * (sortConfig.direction === 'asc' ? 1 : -1);
+                });
+            }
+
+            els.thead.innerHTML = headers.map(h => `
+            <th onclick="handleSort('${h}')">
+                ${h} ${sortConfig.column === h ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+            </th>`).join('');
+
+            const MAX_ROWS = 500;
+            els.tbody.innerHTML = displayData.slice(0, MAX_ROWS).map(row => {
+                let cls = '';
+                if (row._anomalies.some(a => a.type === 'z')) cls = 'anomaly-z';
+                else if (row._anomalies.some(a => a.type === 'sd')) cls = 'anomaly-sd';
+                return `<tr class="${cls}">${headers.map(h => `<td>${row[h] !== null ? row[h] : ''}</td>`).join('')}</tr>`;
+            }).join('');
+
+            els.rowCount.textContent = `Showing ${Math.min(displayData.length, MAX_ROWS)} of ${displayData.length} rows`;
+        }
+
+        function handleSort(col) {
+            if (sortConfig.column === col) {
+                sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortConfig.column = col;
+                sortConfig.direction = 'asc';
+            }
+            renderTable();
+        }
+
+        function addFilter() {
+            activeFilters.push({ id: Date.now(), column: headers[0], operator: 'contains', value: '' });
+            renderFilters();
+            renderTable();
+        }
+
+        function removeFilter(id) {
+            activeFilters = activeFilters.filter(f => f.id !== id);
+            renderFilters();
+            renderTable();
+        }
+
+        function updateFilter(id, key, val) {
+            const f = activeFilters.find(x => x.id === id);
+            if (f) { f[key] = val; renderFilters(); renderTable(); }
+        }
+
+        function renderFilters() {
+            els.activeFilters.innerHTML = activeFilters.map(f => `
+            <div style="display:flex; gap:0.5rem; align-items:center; background:var(--bg-app); padding:0.5rem; border-radius:0.375rem; font-size:0.875rem;">
+                <select onchange="updateFilter(${f.id}, 'column', this.value)" style="padding:0.25rem;">
+                    ${headers.map(h => `<option value="${h}" ${f.column === h ? 'selected' : ''}>${h}</option>`).join('')}
+                </select>
+                <select onchange="updateFilter(${f.id}, 'operator', this.value)" style="padding:0.25rem;">
+                    <option value="contains">contains</option>
+                    <option value=">">></option>
+                    <option value="<"><</option>
+                    <option value="=">=</option>
+                </select>
+                <input type="text" value="${f.value}" oninput="updateFilter(${f.id}, 'value', this.value)" placeholder="Value" style="padding:0.25rem; width:100px;">
+                <button onclick="removeFilter(${f.id})" style="background:none; border:none; color:var(--danger); cursor:pointer; font-weight:bold;">×</button>
+            </div>`).join('');
+        }
+
+        function downloadCSV(mode) {
+            let dataToExport = rawData;
+            if (mode === 'anomalies') dataToExport = rawData.filter(r => r._anomalies.length > 0);
+            const cleanData = dataToExport.map(r => { const { _anomalies, ...rest } = r; return rest; });
+            const csv = Papa.unparse(cleanData);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute('download', `${originalFilename}_${mode === 'anomalies' ? 'anomalies' : 'full'}.csv`);
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        // Viz
+        function showViz(col) {
+            els.vizTitle.textContent = `Analysis: ${col}`;
+            els.vizModal.classList.remove('hidden');
+            const s = stats[col];
+            if (!s || !s.all) return;
+
+            // Hist
+            const ctxHist = document.getElementById('histCanvas').getContext('2d');
+            if (charts.hist) charts.hist.destroy();
+            const binCount = 20;
+            const binSize = (s.all.max - s.all.min) / binCount;
+            const bins = new Array(binCount).fill(0);
+            const labels = [];
+            for (let i = 0; i < binCount; i++) labels.push((s.all.min + i * binSize).toFixed(1));
+            s.all.values.forEach(v => {
+                const idx = Math.min(Math.floor((v - s.all.min) / binSize), binCount - 1);
+                bins[idx]++;
+            });
+            charts.hist = new Chart(ctxHist, {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: 'Frequency', data: bins, backgroundColor: '#6366f1' }] },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+
+            // Box
+            const ctxBox = document.getElementById('boxCanvas').getContext('2d');
+            if (charts.box) charts.box.destroy();
+            charts.box = new Chart(ctxBox, {
+                type: 'boxplot',
+                data: {
+                    labels: [col],
+                    datasets: [{
+                        label: 'Distribution', data: [s.all.values],
+                        backgroundColor: 'rgba(99, 102, 241, 0.5)', borderColor: '#4338ca', borderWidth: 1
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+        }
+
+        function closeViz() { els.vizModal.classList.add('hidden'); }
+    </script>
+</body>
+</html>
