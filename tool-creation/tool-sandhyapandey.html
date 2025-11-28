@@ -3,702 +3,670 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSV Analysis Tool</title>
+    <title>Advanced CSV Analyzer</title>
+    
+    <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://unpkg.com/@sgratzl/chartjs-chart-boxplot@3.10.0/build/index.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.1/dist/chartjs-adapter-moment.min.js"></script>
+
     <style>
         :root {
             --primary: #6366f1;
             --sky-blue: #87ceeb;
             --sidebar-gradient: linear-gradient(180deg, #1e1b4b 0%, #0f172a 60%, #1e3a8a 100%);
             --accent-gradient: linear-gradient(135deg, #6366f1 0%, #87ceeb 100%);
-            
-            /* Theme Colors for Split View */
-            --theme-all: #ef4444; /* Red for All Data */
-            --theme-anom: #10b981; /* Green for Anomalies */
-            
+            --theme-all: #ef4444; 
+            --theme-anom: #10b981; 
             --bg-app: #f3f4f6;
             --surface: #ffffff;
             --text-main: #1f2937;
             --text-muted: #6b7280;
-            --text-light: #e0e7ff;
             --border: #e5e7eb;
             --anomaly-z: #fee2e2;
             --anomaly-sd: #fef3c7;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-app);
-            color: var(--text-main);
-            height: 100vh;
-            overflow: hidden;
-            display: flex;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', system-ui, sans-serif; background-color: var(--bg-app); color: var(--text-main); height: 100vh; overflow: hidden; display: flex; }
 
         /* Sidebar */
-        #sidebar {
-            width: 300px;
-            background: var(--sidebar-gradient);
-            color: var(--text-light);
-            display: flex;
-            flex-direction: column;
-            padding: 1.5rem;
-            overflow-y: auto;
-            flex-shrink: 0;
-            border-right: 1px solid rgba(135, 206, 235, 0.2);
-        }
-        #main-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 2rem;
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        /* Sidebar Components */
-        .brand {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 2rem;
-            color: white;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .sidebar-title {
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.05em;
-            color: var(--sky-blue);
-            margin-bottom: 1rem;
-            font-weight: 600;
-        }
-
+        #sidebar { width: 300px; background: var(--sidebar-gradient); color: white; display: flex; flex-direction: column; padding: 1.5rem; border-right: 1px solid rgba(135,206,235,0.2); overflow-y: auto; flex-shrink: 0; }
+        .brand { font-size: 1.5rem; font-weight: 700; margin-bottom: 2rem; color: white; display: flex; align-items: center; gap: 0.5rem; }
+        .sidebar-title { text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; color: var(--sky-blue); margin-bottom: 1rem; font-weight: 600; }
         .control-group { margin-bottom: 1rem; }
         .control-group label { display: block; font-size: 0.875rem; margin-bottom: 0.5rem; color: #c7d2fe; }
-        .control-group input {
-            width: 100%; padding: 0.5rem; border-radius: 0.375rem;
-            border: 1px solid #4338ca; background: rgba(255, 255, 255, 0.1); color: white;
-        }
-        .control-group input:focus { outline: none; border-color: var(--sky-blue); }
+        .control-group input, .control-group select { width: 100%; padding: 0.5rem; border-radius: 0.375rem; border: 1px solid #4338ca; background: rgba(255,255,255,0.1); color: white; }
+        .btn { display: block; width: 100%; padding: 0.75rem; border-radius: 0.5rem; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
+        .btn-primary { background: var(--accent-gradient); color: white; }
+        .btn-primary:hover { opacity: 0.9; }
+        .upload-area { border: 2px dashed rgba(135,206,235,0.5); border-radius: 0.5rem; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.05); }
+        .upload-area:hover { border-color: var(--sky-blue); background: rgba(255,255,255,0.1); }
 
-        .btn {
-            display: block; width: 100%; padding: 0.75rem; border-radius: 0.5rem;
-            border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center;
-        }
-        .btn-primary { background: var(--accent-gradient); color: white; box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.4); }
-        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
-
-        .upload-area {
-            border: 2px dashed rgba(135, 206, 235, 0.5); border-radius: 0.5rem; padding: 1.5rem;
-            text-align: center; cursor: pointer; transition: all 0.2s; background: rgba(255, 255, 255, 0.05);
-        }
-        .upload-area:hover { border-color: var(--sky-blue); background: rgba(255, 255, 255, 0.1); }
-
-        /* General UI */
-        .card {
-            background: var(--surface); border-radius: 1rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 1.5rem;
-            border: 1px solid var(--border);
-        }
-        .hidden { display: none !important; }
-
-        /* Summary Header */
-        .summary-split { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 0.5rem; }
-        .summary-col h4 {
-            font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;
-            color: var(--text-muted); margin-bottom: 1rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem;
-        }
-        .summary-col.left h4 { border-color: var(--primary); }
-        .summary-col.right h4 { border-color: var(--theme-all); } /* Red for Anomaly Summary Header */
+        /* Main Content */
+        #main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         
-        .summary-stat { display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.9rem; }
-        .summary-stat span:last-child { font-weight: 700; font-size: 1.1rem; }
+        /* Navigation Tabs */
+        .nav-tabs { display: flex; background: white; border-bottom: 1px solid var(--border); padding: 0 2rem; gap: 2rem; }
+        .nav-item { padding: 1.25rem 0; cursor: pointer; color: var(--text-muted); font-weight: 500; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .nav-item:hover { color: var(--primary); }
+        .nav-item.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
 
-        /* --- SPLIT STATS GRID CSS --- */
-        .stats-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem;
-        }
+        /* Tab Content Area */
+        .content-scroll { padding: 2rem; overflow-y: auto; flex: 1; }
+        .tab-pane { display: none; animation: fadeIn 0.3s ease; }
+        .tab-pane.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        .stat-card {
-            background: var(--surface); border-radius: 0.75rem; border: 1px solid var(--border);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); overflow: hidden;
-        }
-
-        .stat-header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 1rem; border-bottom: 1px solid var(--border); background: #f9fafb;
-        }
-        .stat-title { font-weight: 700; color: var(--text-main); font-size: 1rem; }
+        /* Cards & Grid */
+        .card { background: var(--surface); border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); padding: 1.5rem; border: 1px solid var(--border); margin-bottom: 1.5rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; }
         
-        .stat-btn {
-            font-size: 0.75rem; padding: 0.25rem 0.75rem; background: #e0e7ff; color: #4338ca;
-            border-radius: 1rem; border: none; cursor: pointer; font-weight: 500;
-        }
-        .stat-btn:hover { background: var(--sky-blue); color: white; }
-
-        .stat-body-split {
-            display: grid;
-            grid-template-columns: 1fr 1px 1fr; /* Left, Divider, Right */
-            align-items: stretch;
-        }
-
-        .stat-column {
-            padding: 1rem;
-            font-size: 0.85rem;
-        }
-
-        .stat-divider { background: var(--border); height: 100%; width: 1px; }
-
-        .stat-col-header {
-            font-size: 0.75rem; text-transform: uppercase; font-weight: 700;
-            margin-bottom: 0.75rem; letter-spacing: 0.05em;
-        }
-
-        /* Color Themes for Columns */
-        .col-all .stat-col-header { color: var(--theme-all); } /* Red */
-        .col-anom .stat-col-header { color: var(--theme-anom); } /* Green */
-
-        .stat-row {
-            display: flex; justify-content: space-between; margin-bottom: 0.4rem;
-        }
+        /* Stats Specifics */
+        .stat-card { background: white; border-radius: 0.75rem; border: 1px solid var(--border); overflow: hidden; }
+        .stat-header { padding: 1rem; background: #f9fafb; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+        .stat-body { padding: 1rem; font-size: 0.9rem; }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
         .stat-row b { font-weight: 600; }
-        .stat-row.total-sd {
-            margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--border);
-        }
 
-        /* Table & Controls */
-        .table-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
-        .control-cluster { display: flex; gap: 1rem; align-items: center; }
-        .view-select { padding: 0.5rem; border-radius: 0.375rem; border: 1px solid var(--border); font-size: 0.875rem; min-width: 200px; }
-        
-        .export-btn {
-            background: var(--accent-gradient); color: white; border: none; padding: 0.5rem 1rem;
-            border-radius: 0.375rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .export-btn:hover { opacity: 0.9; }
+        /* Categorical Bars */
+        .cat-bar-container { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 0.85rem; }
+        .cat-label { width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cat-bar-bg { flex: 1; background: #f3f4f6; height: 8px; border-radius: 4px; overflow: hidden; }
+        .cat-bar-fill { height: 100%; background: var(--primary); }
+        .cat-count { width: 40px; text-align: right; font-weight: 600; }
 
-        .table-container { overflow: auto; border-radius: 0.5rem; border: 1px solid var(--border); max-height: 600px; background: white; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; white-space: nowrap; }
+        /* Table */
+        .table-container { overflow: auto; border: 1px solid var(--border); max-height: 600px; border-radius: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; white-space: nowrap; }
         th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
-        th { background-color: #f9fafb; font-weight: 600; position: sticky; top: 0; z-index: 10; color: var(--text-muted); cursor: pointer; }
-        th:hover { background-color: #f3f4f6; }
-        tr:hover td { background-color: #f9fafb; }
+        th { background: #f9fafb; position: sticky; top: 0; z-index: 10; cursor: pointer; }
         tr.anomaly-z td { background-color: var(--anomaly-z); }
         tr.anomaly-sd td { background-color: var(--anomaly-sd); }
 
-        /* Modal */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5);
-            display: flex; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(2px);
-        }
-        .modal {
-            background: white; padding: 2rem; border-radius: 1rem; width: 90%; max-width: 900px; max-height: 90vh;
-            overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-        }
+        /* Utils */
+        .hidden { display: none !important; }
+        .badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 99px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+        .badge-num { background: #e0e7ff; color: #4338ca; }
+        .badge-cat { background: #dcfce7; color: #166534; }
+        .badge-date { background: #ffedd5; color: #9a3412; }
 
-        /* Mobile */
-        @media (max-width: 768px) {
-            body { flex-direction: column; overflow: auto; }
-            #sidebar { width: 100%; height: auto; overflow: visible; }
-            #main-content { overflow: visible; }
-            .summary-split { grid-template-columns: 1fr; }
-            .table-controls { flex-direction: column; align-items: flex-start; }
-            .control-cluster { width: 100%; flex-wrap: wrap; }
-            .stat-body-split { grid-template-columns: 1fr; } 
-            .stat-divider { width: 100%; height: 1px; margin: 0.5rem 0; }
-        }
+        /* Responsive */
+        @media (max-width: 768px) { body { flex-direction: column; overflow: auto; } #sidebar { width: 100%; } .nav-tabs { overflow-x: auto; } }
     </style>
 </head>
-
 <body>
 
-    <!-- Sidebar -->
+    <!-- SIDEBAR -->
     <aside id="sidebar">
-        <div class="brand"><span>⚡</span> CSV Analyzer</div>
-
-        <div class="sidebar-section">
-            <div class="sidebar-title">Data Source</div>
-            <div class="upload-area" onclick="document.getElementById('csvInput').click()">
-                <input type="file" id="csvInput" accept=".csv" onchange="handleFileUpload(event)" style="display:none">
-                <div style="font-size: 2.5rem; margin-bottom: 0.25rem;">📄</div>
-                <div style="font-size: 0.875rem; font-weight: bold; color: var(--sky-blue);">CSV FILE</div>
-                <div id="fileNameDisplay" style="font-size: 0.75rem; color: #c7d2fe; margin-top: 0.5rem; word-break: break-all;">Click to Upload</div>
-            </div>
+        <div class="brand"><span>⚡</span> CSV Pro</div>
+        
+        <div class="sidebar-title">Data Input</div>
+        <div class="upload-area" onclick="document.getElementById('csvInput').click()">
+            <input type="file" id="csvInput" accept=".csv" onchange="handleFileUpload(event)" style="display:none">
+            <div style="font-size: 2rem;">📄</div>
+            <div style="font-size: 0.8rem; margin-top:0.5rem;">Click to Upload CSV</div>
         </div>
+        <div id="fileNameDisplay" style="font-size: 0.75rem; color: var(--sky-blue); margin: 0.5rem 0 2rem 0; word-break: break-all;"></div>
 
         <div id="controlsSection" class="hidden">
-            <div class="sidebar-section">
-                <div class="sidebar-title">Anomaly Thresholds</div>
-                <div class="control-group">
-                    <label>Z-Score (Default: 3)</label>
-                    <input type="number" id="zThreshold" value="3" step="0.1">
-                </div>
-                <div class="control-group">
-                    <label>SD Multiplier (Default: 2)</label>
-                    <input type="number" id="sdThreshold" value="2" step="0.1">
-                </div>
-                <button class="btn btn-primary" onclick="analyzeData()">Apply Thresholds</button>
+            <div class="sidebar-title">Anomaly Settings</div>
+            <div class="control-group">
+                <label>Z-Score Threshold</label>
+                <input type="number" id="zThreshold" value="3" step="0.1">
             </div>
+            <div class="control-group">
+                <label>SD Multiplier</label>
+                <input type="number" id="sdThreshold" value="2" step="0.1">
+            </div>
+            <button class="btn btn-primary" onclick="analyzeData()">Re-Analyze</button>
         </div>
     </aside>
 
-    <!-- Main Content -->
+    <!-- MAIN CONTENT -->
     <main id="main-content">
-        <div id="welcomeState" style="text-align: center; margin-top: 4rem; color: var(--text-muted);">
-            <h2>Welcome to CSV Analyzer</h2>
-            <p>Upload a file from the sidebar to begin analysis.</p>
+        <!-- Welcome Screen -->
+        <div id="welcomeState" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+            <h2 style="color: var(--text-muted);">Ready to Analyze</h2>
+            <p style="color: var(--text-muted);">Upload a CSV file to generate insights.</p>
         </div>
 
-        <div id="dashboard" class="hidden">
+        <!-- Dashboard (Hidden initially) -->
+        <div id="dashboard" class="hidden" style="height: 100%; display: flex; flex-direction: column;">
             
-            <!-- Summary Split -->
-            <div class="card summary-split">
-                <div class="summary-col left">
-                    <h4>Dataset Overview</h4>
-                    <div class="summary-stat"><span>Total Rows</span> <span id="sumTotalRows" style="color:var(--primary);">0</span></div>
-                    <div class="summary-stat"><span>Columns Analyzed</span> <span id="sumTotalCols">0</span></div>
-                    <div class="summary-stat"><span>Time</span> <span id="sumTime">0ms</span></div>
-                </div>
-                <div class="summary-col right">
-                    <h4>Anomaly Report</h4>
-                    <div class="summary-stat"><span>Rows with Anomalies</span> <span id="sumAnomalyRows" style="color:var(--theme-all);">0</span></div>
-                    <div class="summary-stat"><span>Anomaly Rate</span> <span id="sumAnomalyRate">0%</span></div>
-                    <!-- Updated Counts -->
-                    <div class="summary-stat"><span>Flagged by Z-Score</span> <span id="sumZCount">0</span></div>
-                    <div class="summary-stat"><span>Flagged by SD Multiplier</span> <span id="sumSdCount">0</span></div>
-                </div>
-            </div>
+            <!-- Navigation -->
+            <nav class="nav-tabs">
+                <div class="nav-item active" onclick="switchTab('tab-overview')">Overview & Stats</div>
+                <div class="nav-item" onclick="switchTab('tab-categorical')">Categorical</div>
+                <div class="nav-item" onclick="switchTab('tab-timeseries')">Time Series & Grouping</div>
+                <div class="nav-item" onclick="switchTab('tab-explorer')">Data Explorer</div>
+            </nav>
 
-            <!-- Split Column Stats Grid -->
-            <div class="card" style="margin-bottom: 2rem;">
-                <h3 style="margin-bottom: 1.5rem; font-size: 1.125rem;">Column Statistics</h3>
-                <div id="statsGrid" class="stats-grid"></div>
-            </div>
+            <div class="content-scroll">
+                
+                <!-- TAB 1: OVERVIEW & NUMERICAL -->
+                <div id="tab-overview" class="tab-pane active">
+                    <div class="card" style="display: flex; justify-content: space-around; text-align: center;">
+                        <div>
+                            <div style="font-size: 0.875rem; color: var(--text-muted);">Total Rows</div>
+                            <div style="font-size: 1.5rem; font-weight: 700;" id="sumRows">0</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.875rem; color: var(--text-muted);">Columns</div>
+                            <div style="font-size: 1.5rem; font-weight: 700;" id="sumCols">0</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.875rem; color: var(--text-muted);">Anomaly Rate</div>
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--theme-all);" id="sumRate">0%</div>
+                        </div>
+                    </div>
 
-            <!-- Table -->
-            <div class="card">
-                <div class="table-controls">
-                    <h3 style="font-size: 1.125rem;">Data Explorer</h3>
-                    <div class="control-cluster">
-                        <select id="viewModeSelect" class="view-select" onchange="handleViewChange()">
-                            <option value="all">View: All Data</option>
-                            <option value="anomalies">View: Anomalies Only</option>
-                        </select>
-                        <button id="dynamicExportBtn" class="export-btn" onclick="handleExportClick()">Download Full CSV</button>
-                        <button class="stat-btn" style="background:var(--bg-app); border:1px solid var(--border); padding: 0.5rem 1rem;" onclick="addFilter()">+ Add Filter</button>
+                    <h3 style="margin-bottom: 1rem;">Numerical Analysis</h3>
+                    <div id="numericGrid" class="stats-grid"></div>
+                </div>
+
+                <!-- TAB 2: CATEGORICAL -->
+                <div id="tab-categorical" class="tab-pane">
+                    <h3 style="margin-bottom: 1rem;">Categorical Distributions</h3>
+                    <div id="categoricalGrid" class="stats-grid"></div>
+                </div>
+
+                <!-- TAB 3: TIME SERIES & GROUPING -->
+                <div id="tab-timeseries" class="tab-pane">
+                    <!-- Time Series -->
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                            <h3>Time Series Trends</h3>
+                            <select id="timeColSelect" onchange="renderTimeChart()" style="padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border);">
+                                <option value="">Select Date Column</option>
+                            </select>
+                        </div>
+                        <canvas id="timeChart" height="80"></canvas>
+                        <p id="noTimeMsg" class="hidden" style="text-align: center; color: var(--text-muted); margin-top: 1rem;">No Date/Time columns detected.</p>
+                    </div>
+
+                    <!-- Grouping / Pivot -->
+                    <div class="card">
+                        <h3>Aggregation Tool</h3>
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; align-items: end;">
+                            <div>
+                                <label style="font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">Group By (Category)</label>
+                                <select id="groupCol" class="control-group" style="color:black; border-color:#ccc; background:white; padding:0.5rem; width: 200px;"></select>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">Calculate (Number)</label>
+                                <select id="aggCol" style="color:black; border-color:#ccc; padding:0.5rem; width: 200px; border-radius: 4px;"></select>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8rem; display: block; margin-bottom: 0.25rem;">Operation</label>
+                                <select id="aggOp" style="color:black; border-color:#ccc; padding:0.5rem; width: 100px; border-radius: 4px;">
+                                    <option value="sum">Sum</option>
+                                    <option value="avg">Average</option>
+                                    <option value="count">Count</option>
+                                    <option value="min">Min</option>
+                                    <option value="max">Max</option>
+                                </select>
+                            </div>
+                            <button onclick="calculateGroup()" class="btn btn-primary" style="width: auto; padding: 0.5rem 1.5rem; margin-bottom: 2px;">Calculate</button>
+                        </div>
+                        <div id="aggResultContainer" class="table-container hidden">
+                            <table id="aggTable">
+                                <thead><tr><th>Category</th><th>Result</th></tr></thead>
+                                <tbody id="aggBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
-                <div id="activeFilters" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;"></div>
+                <!-- TAB 4: DATA EXPLORER -->
+                <div id="tab-explorer" class="tab-pane">
+                    <div class="card">
+                        <div style="display:flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+                            <div style="display: flex; gap: 0.5rem;">
+                                <select id="viewMode" onchange="renderTable()" style="padding:0.5rem; border:1px solid var(--border); border-radius:4px;">
+                                    <option value="all">Show All Data</option>
+                                    <option value="anomalies">Show Anomalies Only</option>
+                                </select>
+                                <button onclick="addFilter()" style="padding:0.5rem; background:white; border:1px solid var(--border); border-radius:4px; cursor:pointer;">+ Add Filter</button>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button onclick="downloadCSV('full')" style="background: var(--primary); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">Download Full CSV</button>
+                                <button onclick="downloadCSV('anomalies')" style="background: var(--theme-all); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">Download Anomalies</button>
+                            </div>
+                        </div>
 
-                <div class="table-container">
-                    <table id="dataTable">
-                        <thead><tr id="tableHeader"></tr></thead>
-                        <tbody id="tableBody"></tbody>
-                    </table>
+                        <div id="activeFilters" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;"></div>
+                        
+                        <div class="table-container">
+                            <table id="dataTable">
+                                <thead id="tableHead"></thead>
+                                <tbody id="tableBody"></tbody>
+                            </table>
+                        </div>
+                        <div id="rowCountDisplay" style="margin-top:0.5rem; color:var(--text-muted); font-size:0.85rem;"></div>
+                    </div>
                 </div>
-                <div id="rowCount" style="margin-top: 1rem; color: var(--text-muted); font-size: 0.875rem;"></div>
+
             </div>
         </div>
     </main>
 
-    <!-- Modal -->
-    <div id="vizModal" class="modal-overlay hidden" onclick="if(event.target === this) closeViz()">
-        <div class="modal">
-            <div style="display:flex; justify-content:space-between; margin-bottom:1.5rem;">
-                <h2 id="vizTitle">Column Analysis</h2>
-                <button onclick="closeViz()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">×</button>
+    <!-- VIZ MODAL -->
+    <div id="vizModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(2px);" onclick="if(event.target === this) this.classList.add('hidden')">
+        <div style="background: white; padding: 2rem; border-radius: 1rem; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <div style="display:flex; justify-content:space-between; margin-bottom: 1rem;">
+                <h3 id="vizTitle">Visualization</h3>
+                <button onclick="document.getElementById('vizModal').classList.add('hidden')" style="border:none; background:none; font-size: 1.5rem; cursor:pointer;">&times;</button>
             </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
-                <div>
-                    <h3 style="margin-bottom:1rem; font-size:1rem; color:var(--text-muted);">Histogram (All Data)</h3>
-                    <canvas id="histCanvas" height="200"></canvas>
-                </div>
-                <div>
-                    <h3 style="margin-bottom:1rem; font-size:1rem; color:var(--text-muted);">Box Plot (All Data)</h3>
-                    <canvas id="boxCanvas" height="200"></canvas>
-                </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                <div><h4 style="font-size:0.9rem; color:var(--text-muted); margin-bottom:0.5rem;">Histogram</h4><canvas id="histCanvas"></canvas></div>
+                <div><h4 style="font-size:0.9rem; color:var(--text-muted); margin-bottom:0.5rem;">Box Plot</h4><canvas id="boxCanvas"></canvas></div>
             </div>
         </div>
     </div>
 
     <script>
-        // State
+        // --- STATE ---
         let rawData = [];
         let headers = [];
-        let columnTypes = {};
+        let colTypes = {}; // { colName: 'number' | 'string' | 'date' }
         let stats = {};
+        let categoricalStats = {};
         let activeFilters = [];
-        let sortConfig = { column: null, direction: 'asc' };
-        let charts = { hist: null, box: null };
-        let originalFilename = "data";
+        let charts = { hist: null, box: null, time: null };
 
-        // DOM
-        const els = {
-            csvInput: document.getElementById('csvInput'),
-            fileNameDisplay: document.getElementById('fileNameDisplay'),
-            controlsSection: document.getElementById('controlsSection'),
-            welcomeState: document.getElementById('welcomeState'),
-            dashboard: document.getElementById('dashboard'),
-            statsGrid: document.getElementById('statsGrid'),
-            sumTotalRows: document.getElementById('sumTotalRows'),
-            sumTotalCols: document.getElementById('sumTotalCols'),
-            sumTime: document.getElementById('sumTime'),
-            sumAnomalyRows: document.getElementById('sumAnomalyRows'),
-            sumAnomalyRate: document.getElementById('sumAnomalyRate'),
-            sumZCount: document.getElementById('sumZCount'),
-            sumSdCount: document.getElementById('sumSdCount'), // Added this
-            zInput: document.getElementById('zThreshold'),
-            sdInput: document.getElementById('sdThreshold'),
-            viewSelect: document.getElementById('viewModeSelect'),
-            exportBtn: document.getElementById('dynamicExportBtn'),
-            thead: document.getElementById('tableHeader'),
-            tbody: document.getElementById('tableBody'),
-            rowCount: document.getElementById('rowCount'),
-            activeFilters: document.getElementById('activeFilters'),
-            vizModal: document.getElementById('vizModal'),
-            vizTitle: document.getElementById('vizTitle')
+        // --- UI UTILS ---
+        const getEl = id => document.getElementById(id);
+        const switchTab = (tabId) => {
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            getEl(tabId).classList.add('active');
+            event.target.classList.add('active');
         };
 
-        // --- Logic ---
-        function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            originalFilename = file.name.replace('.csv', '');
-            els.fileNameDisplay.textContent = file.name;
-            const startTime = performance.now();
-
+        // --- FILE HANDLING ---
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            getEl('fileNameDisplay').textContent = file.name;
+            
             Papa.parse(file, {
                 header: true, dynamicTyping: true, skipEmptyLines: true,
-                complete: function (results) {
-                    if (results.data.length === 0) return alert("Empty CSV");
-                    rawData = results.data;
-                    headers = results.meta.fields;
-                    headers.forEach(h => {
-                        const valid = rawData.find(r => r[h] !== null && r[h] !== '');
-                        columnTypes[h] = (typeof valid?.[h] === 'number') ? 'number' : 'string';
-                    });
-                    els.welcomeState.classList.add('hidden');
-                    els.dashboard.classList.remove('hidden');
-                    els.controlsSection.classList.remove('hidden');
-                    analyzeData(startTime);
-                },
-                error: err => alert("Error: " + err.message)
+                complete: (res) => {
+                    rawData = res.data;
+                    headers = res.meta.fields;
+                    detectTypes();
+                    
+                    getEl('welcomeState').classList.add('hidden');
+                    getEl('dashboard').classList.remove('hidden');
+                    getEl('controlsSection').classList.remove('hidden');
+                    getEl('main-content').style.display = 'flex'; // Fix layout on load
+                    
+                    analyzeData();
+                }
             });
         }
 
-        // Helper: Calculate basic stats array
-        function calculateBasicStats(values) {
-            if (values.length === 0) return null;
-            const n = values.length;
-            const mean = values.reduce((a, b) => a + b, 0) / n;
-            const sorted = [...values].sort((a, b) => a - b);
-            const median = n % 2 === 0 ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2 : sorted[Math.floor(n / 2)];
-            const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n;
-            const stdDev = Math.sqrt(variance);
-            const min = sorted[0];
-            const max = sorted[n - 1];
-            return { mean, median, min, max, stdDev, count: n };
+        // --- ANALYSIS CORE ---
+        function detectTypes() {
+            // Check first 50 rows to detect type
+            headers.forEach(h => {
+                let numCount = 0, dateCount = 0, strCount = 0;
+                let sample = rawData.slice(0, 50);
+                
+                sample.forEach(row => {
+                    let val = row[h];
+                    if(val === null || val === '') return;
+                    
+                    if(typeof val === 'number') numCount++;
+                    // Basic date check (string looks like date and parses)
+                    else if(typeof val === 'string' && val.length > 5 && !isNaN(Date.parse(val)) && !/^\d+$/.test(val)) dateCount++;
+                    else strCount++;
+                });
+
+                if(numCount > strCount && numCount > dateCount) colTypes[h] = 'number';
+                else if(dateCount > strCount) colTypes[h] = 'date';
+                else colTypes[h] = 'string';
+            });
+            console.log("Detected Types:", colTypes);
         }
 
-        function analyzeData(startTime = null) {
-            if(!startTime) startTime = performance.now();
-            stats = {};
-            const zThresh = parseFloat(els.zInput.value) || 3;
-            const sdThresh = parseFloat(els.sdInput.value) || 2;
-            let zCount = 0;
-            let sdCount = 0; // Added SD Counter
+        function analyzeData() {
+            const zThresh = parseFloat(getEl('zThreshold').value);
+            const sdThresh = parseFloat(getEl('sdThreshold').value);
+            
+            stats = {}; 
+            categoricalStats = {};
+            let totalAnomalies = 0;
 
-            // Reset anomalies
+            // Reset Anomalies
             rawData.forEach(r => r._anomalies = []);
 
             headers.forEach(col => {
-                if (columnTypes[col] === 'number') {
-                    // 1. Get All Values
-                    const allValues = rawData.map(r => r[col]).filter(v => v !== null && v !== '' && !isNaN(v));
-                    if (allValues.length === 0) return;
+                const type = colTypes[col];
+                const values = rawData.map(r => r[col]).filter(v => v !== null && v !== '');
 
-                    // 2. Calculate Stats for All Data
-                    const allStats = calculateBasicStats(allValues);
+                // 1. Numerical Analysis
+                if(type === 'number') {
+                    // Basic Stats
+                    const n = values.length;
+                    const mean = values.reduce((a,b)=>a+b,0)/n;
+                    const sorted = [...values].sort((a,b)=>a-b);
+                    const median = n%2===0 ? (sorted[n/2-1]+sorted[n/2])/2 : sorted[Math.floor(n/2)];
+                    const variance = values.reduce((a,b)=>a+Math.pow(b-mean,2),0)/n;
+                    const stdDev = Math.sqrt(variance);
 
-                    // 3. Detect Anomalies & Collect Anomaly Values
-                    const anomalyValues = [];
-                    
+                    stats[col] = { mean, median, min: sorted[0], max: sorted[n-1], stdDev, values };
+
+                    // Detect Anomalies
                     rawData.forEach(row => {
                         const val = row[col];
-                        if (val === null || val === '' || isNaN(val)) return;
-
-                        let isAnomaly = false;
-                        const zScore = (val - allStats.mean) / allStats.stdDev;
-                        
-                        if (Math.abs(zScore) > zThresh) {
+                        if(typeof val !== 'number') return;
+                        if(Math.abs((val - mean)/stdDev) > zThresh) {
                             row._anomalies.push({ col, type: 'z', val });
-                            zCount++;
-                            isAnomaly = true;
-                        } else if (Math.abs(val - allStats.mean) > sdThresh * allStats.stdDev) {
+                            totalAnomalies++;
+                        } else if (Math.abs(val - mean) > sdThresh*stdDev) {
                             row._anomalies.push({ col, type: 'sd', val });
-                            sdCount++; // Increment SD count
-                            isAnomaly = true;
-                        }
-
-                        if(isAnomaly) {
-                            anomalyValues.push(val);
+                            totalAnomalies++;
                         }
                     });
+                }
 
-                    // 4. Calculate Stats for Anomalies Only
-                    const anomStats = calculateBasicStats(anomalyValues);
-
-                    // Store both sets of stats
-                    stats[col] = {
-                        all: { ...allStats, values: allValues },
-                        anomalies: anomStats // might be null if no anomalies
-                    };
+                // 2. Categorical Analysis
+                if(type === 'string') {
+                    const counts = {};
+                    values.forEach(v => counts[v] = (counts[v]||0) + 1);
+                    const entries = Object.entries(counts).sort((a,b) => b[1] - a[1]); // Sort desc
+                    categoricalStats[col] = { unique: entries.length, top: entries.slice(0, 5), counts };
                 }
             });
 
-            // Summary
-            const rowsWithAnomalies = rawData.filter(r => r._anomalies.length > 0).length;
-            const totalRows = rawData.length;
-            const rate = ((rowsWithAnomalies / totalRows) * 100).toFixed(1);
-            const endTime = performance.now();
-
-            els.sumTotalRows.textContent = totalRows.toLocaleString();
-            els.sumTotalCols.textContent = headers.length;
-            els.sumTime.textContent = (endTime - startTime).toFixed(0) + 'ms';
-            els.sumAnomalyRows.textContent = rowsWithAnomalies.toLocaleString();
-            els.sumAnomalyRate.textContent = rate + '%';
-            els.sumZCount.textContent = zCount.toLocaleString();
-            els.sumSdCount.textContent = sdCount.toLocaleString(); // Update SD Count UI
-
-            renderStats();
+            updateOverview(totalAnomalies);
+            renderNumericalGrid();
+            renderCategoricalGrid();
+            setupGroupingUI();
+            setupTimeUI();
             renderTable();
         }
 
-        function renderStats() {
-            els.statsGrid.innerHTML = '';
+        function updateOverview(anomCount) {
+            getEl('sumRows').textContent = rawData.length.toLocaleString();
+            getEl('sumCols').textContent = headers.length;
+            const rowsWithAnom = rawData.filter(r => r._anomalies.length > 0).length;
+            getEl('sumRate').textContent = ((rowsWithAnom / rawData.length) * 100).toFixed(1) + "%";
+        }
+
+        // --- RENDERING TABS ---
+
+        // 1. Numerical
+        function renderNumericalGrid() {
+            const grid = getEl('numericGrid');
+            grid.innerHTML = '';
             Object.keys(stats).forEach(col => {
                 const s = stats[col];
-                
-                // Helper to render a number or dash
-                const fmt = (num) => num !== undefined && num !== null ? num.toFixed(2) : '-';
-                
-                // Generate HTML for Anomalies side
-                let anomHtml = `<div class="stat-row" style="justify-content:center; color:#ccc;">No Anomalies</div>`;
-                if(s.anomalies) {
-                    anomHtml = `
-                        <div class="stat-row"><span>Mean:</span> <b>${fmt(s.anomalies.mean)}</b></div>
-                        <div class="stat-row"><span>Median:</span> <b>${fmt(s.anomalies.median)}</b></div>
-                        <div class="stat-row"><span>Min:</span> <b>${s.anomalies.min}</b></div>
-                        <div class="stat-row"><span>Max:</span> <b>${s.anomalies.max}</b></div>
-                        <div class="stat-row total-sd"><span>StdDev:</span> <b>${fmt(s.anomalies.stdDev)}</b></div>
-                    `;
-                }
-
-                els.statsGrid.innerHTML += `
-                <div class="stat-card">
-                    <div class="stat-header">
-                        <div class="stat-title">${col}</div>
-                        <button class="stat-btn" onclick="showViz('${col}')">Visualize</button>
-                    </div>
-                    
-                    <div class="stat-body-split">
-                        <!-- Left: All Data (Red) -->
-                        <div class="stat-column col-all">
-                            <div class="stat-col-header">All Data (${s.all.count})</div>
-                            <div class="stat-row"><span>Mean:</span> <b>${fmt(s.all.mean)}</b></div>
-                            <div class="stat-row"><span>Median:</span> <b>${fmt(s.all.median)}</b></div>
-                            <div class="stat-row"><span>Min:</span> <b>${s.all.min}</b></div>
-                            <div class="stat-row"><span>Max:</span> <b>${s.all.max}</b></div>
-                            <div class="stat-row total-sd"><span>StdDev:</span> <b>${fmt(s.all.stdDev)}</b></div>
+                grid.innerHTML += `
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <span class="badge badge-num">NUM</span> ${col}
+                            </div>
+                            <button class="btn btn-primary" style="width:auto; padding:0.25rem 0.5rem; font-size:0.7rem;" onclick="showViz('${col}')">Viz</button>
                         </div>
-
-                        <div class="stat-divider"></div>
-
-                        <!-- Right: Anomalies (Green) -->
-                        <div class="stat-column col-anom">
-                            <div class="stat-col-header">Anomalies (${s.anomalies ? s.anomalies.count : 0})</div>
-                            ${anomHtml}
+                        <div class="stat-body">
+                            <div class="stat-row"><span>Mean</span><b>${s.mean.toFixed(2)}</b></div>
+                            <div class="stat-row"><span>Median</span><b>${s.median.toFixed(2)}</b></div>
+                            <div class="stat-row"><span>StdDev</span><b>${s.stdDev.toFixed(2)}</b></div>
+                            <div class="stat-row"><span>Min</span><b>${s.min}</b></div>
+                            <div class="stat-row"><span>Max</span><b>${s.max}</b></div>
                         </div>
-                    </div>
-                </div>
-            `;
+                    </div>`;
             });
         }
 
-        function handleViewChange() {
-            const mode = els.viewSelect.value;
-            if(mode === 'all') {
-                els.exportBtn.textContent = "Download Full CSV";
-                els.exportBtn.style.background = "var(--accent-gradient)";
+        // 2. Categorical
+        function renderCategoricalGrid() {
+            const grid = getEl('categoricalGrid');
+            grid.innerHTML = '';
+            Object.keys(categoricalStats).forEach(col => {
+                const s = categoricalStats[col];
+                const total = rawData.length; // Approximate for bar width
+                const bars = s.top.map(([key, count]) => {
+                    const pct = (count / total) * 100;
+                    return `
+                    <div class="cat-bar-container">
+                        <div class="cat-label" title="${key}">${key}</div>
+                        <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${pct}%"></div></div>
+                        <div class="cat-count">${count}</div>
+                    </div>`;
+                }).join('');
+
+                grid.innerHTML += `
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div><span class="badge badge-cat">TXT</span> ${col}</div>
+                            <small>${s.unique} Unique</small>
+                        </div>
+                        <div class="stat-body">${bars}</div>
+                    </div>`;
+            });
+        }
+
+        // 3. Time Series
+        function setupTimeUI() {
+            const dateCols = Object.keys(colTypes).filter(c => colTypes[c] === 'date');
+            const select = getEl('timeColSelect');
+            select.innerHTML = '<option value="">Select Date Column</option>';
+            
+            if(dateCols.length === 0) {
+                getEl('noTimeMsg').classList.remove('hidden');
+                getEl('timeChart').classList.add('hidden');
             } else {
-                els.exportBtn.textContent = "Download Anomalies Only";
-                els.exportBtn.style.background = "linear-gradient(135deg, #ef4444 0%, #fca5a5 100%)";
+                getEl('noTimeMsg').classList.add('hidden');
+                getEl('timeChart').classList.remove('hidden');
+                dateCols.forEach(c => select.innerHTML += `<option value="${c}">${c}</option>`);
+                // Auto select first
+                select.value = dateCols[0];
+                renderTimeChart();
             }
-            renderTable();
         }
 
-        function handleExportClick() {
-            downloadCSV(els.viewSelect.value);
-        }
+        function renderTimeChart() {
+            const col = getEl('timeColSelect').value;
+            if(!col) return;
 
-        function renderTable() {
-            const viewMode = els.viewSelect.value;
-            let displayData = rawData.filter(row => {
-                if (viewMode === 'anomalies' && row._anomalies.length === 0) return false;
-                return activeFilters.every(f => {
-                    const val = row[f.column];
-                    if (val == null) return false;
-                    if (columnTypes[f.column] === 'number') {
-                        const numVal = parseFloat(f.value);
-                        if (isNaN(numVal)) return true;
-                        switch (f.operator) {
-                            case '>': return val > numVal;
-                            case '<': return val < numVal;
-                            case '>=': return val >= numVal;
-                            case '<=': return val <= numVal;
-                            case '=': return val === numVal;
-                            default: return true;
-                        }
-                    } else {
-                        return String(val).toLowerCase().includes(f.value.toLowerCase());
+            // Simple aggregation: Count per day
+            const timeMap = {};
+            rawData.forEach(r => {
+                const dStr = r[col];
+                if(!dStr) return;
+                const d = new Date(dStr).toISOString().split('T')[0]; // YYYY-MM-DD
+                timeMap[d] = (timeMap[d] || 0) + 1;
+            });
+
+            const sortedDates = Object.keys(timeMap).sort();
+            const dataPoints = sortedDates.map(d => ({ x: d, y: timeMap[d] }));
+
+            const ctx = getEl('timeChart').getContext('2d');
+            if(charts.time) charts.time.destroy();
+
+            charts.time = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Records per Day',
+                        data: dataPoints,
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { type: 'time', time: { unit: 'day' } }
                     }
-                });
+                }
+            });
+        }
+
+        // 3b. Grouping Logic
+        function setupGroupingUI() {
+            const groupSel = getEl('groupCol');
+            const aggSel = getEl('aggCol');
+            groupSel.innerHTML = ''; aggSel.innerHTML = '';
+
+            Object.keys(colTypes).forEach(c => {
+                if(colTypes[c] === 'string' || colTypes[c] === 'date') groupSel.innerHTML += `<option value="${c}">${c}</option>`;
+                if(colTypes[c] === 'number') aggSel.innerHTML += `<option value="${c}">${c}</option>`;
+            });
+        }
+
+        function calculateGroup() {
+            const gCol = getEl('groupCol').value;
+            const aCol = getEl('aggCol').value;
+            const op = getEl('aggOp').value;
+            
+            if(!gCol || !aCol) return alert("Select columns");
+
+            const groups = {};
+            rawData.forEach(r => {
+                const k = r[gCol] || "(Empty)";
+                const v = r[aCol];
+                if(typeof v !== 'number') return;
+                if(!groups[k]) groups[k] = [];
+                groups[k].push(v);
             });
 
-            if (sortConfig.column) {
-                displayData.sort((a, b) => {
-                    let valA = a[sortConfig.column];
-                    let valB = b[sortConfig.column];
-                    if (valA === valB) return 0;
-                    if (valA === null) return 1;
-                    if (valB === null) return -1;
-                    return (valA > valB ? 1 : -1) * (sortConfig.direction === 'asc' ? 1 : -1);
+            let results = Object.entries(groups).map(([key, vals]) => {
+                let res = 0;
+                if(op === 'sum') res = vals.reduce((a,b)=>a+b,0);
+                else if(op === 'avg') res = vals.reduce((a,b)=>a+b,0) / vals.length;
+                else if(op === 'count') res = vals.length;
+                else if(op === 'min') res = Math.min(...vals);
+                else if(op === 'max') res = Math.max(...vals);
+                return { key, res };
+            });
+
+            results.sort((a,b) => b.res - a.res); // Sort descending
+
+            getEl('aggResultContainer').classList.remove('hidden');
+            getEl('aggBody').innerHTML = results.map(r => `<tr><td>${r.key}</td><td>${r.res.toLocaleString(undefined, {maximumFractionDigits:2})}</td></tr>`).join('');
+        }
+
+        // 4. Data Explorer (Table)
+        function renderTable() {
+            const viewMode = getEl('viewMode').value;
+            let data = rawData;
+
+            // 1. Filter by Anomalies
+            if(viewMode === 'anomalies') {
+                data = data.filter(r => r._anomalies.length > 0);
+            }
+
+            // 2. Filter by User Filters
+            if(activeFilters.length > 0) {
+                data = data.filter(row => {
+                    return activeFilters.every(f => {
+                        const val = row[f.col];
+                        if(val == null) return false;
+                        if(colTypes[f.col] === 'number') {
+                            const num = parseFloat(f.val);
+                            if(isNaN(num)) return true;
+                            if(f.op === '>') return val > num;
+                            if(f.op === '<') return val < num;
+                            if(f.op === '=') return val === num;
+                        } else {
+                            return String(val).toLowerCase().includes(f.val.toLowerCase());
+                        }
+                        return true;
+                    });
                 });
             }
 
-            els.thead.innerHTML = headers.map(h => `
-            <th onclick="handleSort('${h}')">
-                ${h} ${sortConfig.column === h ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-            </th>`).join('');
-
-            const MAX_ROWS = 500;
-            els.tbody.innerHTML = displayData.slice(0, MAX_ROWS).map(row => {
+            // Render
+            getEl('tableHead').innerHTML = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+            getEl('tableBody').innerHTML = data.slice(0, 200).map(r => {
                 let cls = '';
-                if (row._anomalies.some(a => a.type === 'z')) cls = 'anomaly-z';
-                else if (row._anomalies.some(a => a.type === 'sd')) cls = 'anomaly-sd';
-                return `<tr class="${cls}">${headers.map(h => `<td>${row[h] !== null ? row[h] : ''}</td>`).join('')}</tr>`;
+                if(r._anomalies.some(a=>a.type==='z')) cls = 'anomaly-z';
+                else if(r._anomalies.some(a=>a.type==='sd')) cls = 'anomaly-sd';
+                return `<tr class="${cls}">${headers.map(h => `<td>${r[h]}</td>`).join('')}</tr>`;
             }).join('');
-
-            els.rowCount.textContent = `Showing ${Math.min(displayData.length, MAX_ROWS)} of ${displayData.length} rows`;
+            
+            getEl('rowCountDisplay').textContent = `Showing ${Math.min(200, data.length)} of ${data.length} rows`;
         }
 
-        function handleSort(col) {
-            if (sortConfig.column === col) {
-                sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
-            } else {
-                sortConfig.column = col;
-                sortConfig.direction = 'asc';
-            }
-            renderTable();
-        }
-
+        // --- FILTERING ---
         function addFilter() {
-            activeFilters.push({ id: Date.now(), column: headers[0], operator: 'contains', value: '' });
+            activeFilters.push({ id: Date.now(), col: headers[0], op: 'contains', val: '' });
             renderFilters();
-            renderTable();
         }
-
-        function removeFilter(id) {
-            activeFilters = activeFilters.filter(f => f.id !== id);
-            renderFilters();
-            renderTable();
-        }
-
-        function updateFilter(id, key, val) {
-            const f = activeFilters.find(x => x.id === id);
-            if (f) { f[key] = val; renderFilters(); renderTable(); }
-        }
-
         function renderFilters() {
-            els.activeFilters.innerHTML = activeFilters.map(f => `
-            <div style="display:flex; gap:0.5rem; align-items:center; background:var(--bg-app); padding:0.5rem; border-radius:0.375rem; font-size:0.875rem;">
-                <select onchange="updateFilter(${f.id}, 'column', this.value)" style="padding:0.25rem;">
-                    ${headers.map(h => `<option value="${h}" ${f.column === h ? 'selected' : ''}>${h}</option>`).join('')}
-                </select>
-                <select onchange="updateFilter(${f.id}, 'operator', this.value)" style="padding:0.25rem;">
-                    <option value="contains">contains</option>
-                    <option value=">">></option>
-                    <option value="<"><</option>
-                    <option value="=">=</option>
-                </select>
-                <input type="text" value="${f.value}" oninput="updateFilter(${f.id}, 'value', this.value)" placeholder="Value" style="padding:0.25rem; width:100px;">
-                <button onclick="removeFilter(${f.id})" style="background:none; border:none; color:var(--danger); cursor:pointer; font-weight:bold;">×</button>
-            </div>`).join('');
+            getEl('activeFilters').innerHTML = activeFilters.map(f => `
+                <div style="background:white; border:1px solid var(--border); padding:0.5rem; border-radius:4px; display:flex; gap:0.5rem; align-items:center;">
+                    <select onchange="updateFilter(${f.id}, 'col', this.value)">${headers.map(h=>`<option value="${h}" ${f.col===h?'selected':''}>${h}</option>`).join('')}</select>
+                    <select onchange="updateFilter(${f.id}, 'op', this.value)">
+                        <option value="contains">contains</option>
+                        <option value=">">></option><option value="<"><</option><option value="=">=</option>
+                    </select>
+                    <input type="text" value="${f.val}" oninput="updateFilter(${f.id}, 'val', this.value)" style="width:80px; padding:0.25rem;">
+                    <button onclick="removeFilter(${f.id})" style="color:red; background:none; border:none; cursor:pointer;">&times;</button>
+                </div>
+            `).join('');
         }
+        function updateFilter(id, k, v) { activeFilters.find(x=>x.id===id)[k]=v; renderTable(); }
+        function removeFilter(id) { activeFilters = activeFilters.filter(x=>x.id!==id); renderFilters(); renderTable(); }
 
+        // --- EXPORT ---
         function downloadCSV(mode) {
-            let dataToExport = rawData;
-            if (mode === 'anomalies') dataToExport = rawData.filter(r => r._anomalies.length > 0);
-            const cleanData = dataToExport.map(r => { const { _anomalies, ...rest } = r; return rest; });
-            const csv = Papa.unparse(cleanData);
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.setAttribute('download', `${originalFilename}_${mode === 'anomalies' ? 'anomalies' : 'full'}.csv`);
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            let data = rawData;
+            if(mode === 'anomalies') data = rawData.filter(r => r._anomalies.length > 0);
+            const clean = data.map(({_anomalies, ...rest}) => rest);
+            const csv = Papa.unparse(clean);
+            const blob = new Blob([csv], {type:'text/csv'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `export_${mode}.csv`;
+            a.click();
         }
 
-        // Viz
+        // --- VISUALIZATION MODAL ---
         function showViz(col) {
-            els.vizTitle.textContent = `Analysis: ${col}`;
-            els.vizModal.classList.remove('hidden');
+            getEl('vizModal').classList.remove('hidden');
+            getEl('vizTitle').textContent = `Analysis: ${col}`;
             const s = stats[col];
-            if (!s || !s.all) return;
-
+            
             // Hist
-            const ctxHist = document.getElementById('histCanvas').getContext('2d');
-            if (charts.hist) charts.hist.destroy();
-            const binCount = 20;
-            const binSize = (s.all.max - s.all.min) / binCount;
-            const bins = new Array(binCount).fill(0);
-            const labels = [];
-            for (let i = 0; i < binCount; i++) labels.push((s.all.min + i * binSize).toFixed(1));
-            s.all.values.forEach(v => {
-                const idx = Math.min(Math.floor((v - s.all.min) / binSize), binCount - 1);
-                bins[idx]++;
+            const ctx1 = getEl('histCanvas').getContext('2d');
+            if(charts.hist) charts.hist.destroy();
+            
+            const bins = 20;
+            const binSize = (s.max - s.min)/bins;
+            const dataBins = new Array(bins).fill(0);
+            const labels = new Array(bins).fill(0).map((_,i) => (s.min + i*binSize).toFixed(1));
+            
+            s.values.forEach(v => {
+                let idx = Math.floor((v - s.min)/binSize);
+                if(idx >= bins) idx = bins-1;
+                dataBins[idx]++;
             });
-            charts.hist = new Chart(ctxHist, {
+
+            charts.hist = new Chart(ctx1, {
                 type: 'bar',
-                data: { labels: labels, datasets: [{ label: 'Frequency', data: bins, backgroundColor: '#6366f1' }] },
-                options: { responsive: true, plugins: { legend: { display: false } } }
+                data: { labels, datasets: [{ label: 'Frequency', data: dataBins, backgroundColor: '#6366f1' }] }
             });
 
             // Box
-            const ctxBox = document.getElementById('boxCanvas').getContext('2d');
-            if (charts.box) charts.box.destroy();
-            charts.box = new Chart(ctxBox, {
+            const ctx2 = getEl('boxCanvas').getContext('2d');
+            if(charts.box) charts.box.destroy();
+            charts.box = new Chart(ctx2, {
                 type: 'boxplot',
-                data: {
-                    labels: [col],
-                    datasets: [{
-                        label: 'Distribution', data: [s.all.values],
-                        backgroundColor: 'rgba(99, 102, 241, 0.5)', borderColor: '#4338ca', borderWidth: 1
-                    }]
-                },
-                options: { responsive: true, plugins: { legend: { display: false } } }
+                data: { labels: [col], datasets: [{ label: col, data: [s.values], backgroundColor: 'rgba(99,102,241,0.5)', borderColor:'#4338ca' }] }
             });
         }
-
-        function closeViz() { els.vizModal.classList.add('hidden'); }
     </script>
 </body>
-
 </html>
